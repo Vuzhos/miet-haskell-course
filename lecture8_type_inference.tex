@@ -1,0 +1,644 @@
+\documentclass[11pt]{beamer}
+\input{lecture_preamble.tex}
+\newcommand{\lst}[1]{\mathtt{[}#1\mathtt{]}}
+\newcommand{\tInt}{\mathtt{Int}}
+\newcommand{\tBool}{\mathtt{Bool}}
+\newcommand{\tMaybe}{\mathtt{Maybe}}
+\newcommand{\tNum}{\mathtt{Num}}
+\newcommand{\fresh}{\mathord{\mathit{fresh}}()}
+\newcommand{\J}{\mathcal{J}}
+\newcommand{\Malg}{\mathcal{M}}
+
+\title{Лекция 8: вывод типов}
+
+\begin{document}
+\begin{frame}[plain]
+  \maketitle
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Вывод типов в других языках}
+  \begin{itemize}
+    \item Во многих ООП-языках сейчас есть вывод типов локальных переменных (иногда и возвращаемого типа):
+          \hspace{-1em}
+          \pause
+          \begin{itemize}
+            \item \mintinline{cpp}!auto! в C++11
+            \item \mintinline{csharp}!var! в C\# 3.0 и Java 10
+            \item Отсутствие явного типа в Kotlin, Scala
+          \end{itemize}
+          \pause
+    \item Устроен в них всех похоже:
+          \begin{itemize}
+            \pause
+            \item Тип аргументов функций задаётся явно.
+                  \pause
+            \item Дальше типы протягиваются сверху вниз.
+                  \pause
+            \item Тип локальных переменных/полей $=$ тип инициализатора (если нет явного).
+                  \pause
+            \item Возвращаемый тип $=$ общий тип для всех \mintinline{cpp}!return!.
+          \end{itemize}
+          \pause
+    \item Отдельный вопрос: вывод параметров шаблонов (в C++)/генериков (в других языках).
+          \pause
+    \item Он сложнее, но появился раньше.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Вывод типов в системе Хиндли "--- Милнера}
+  \begin{itemize}
+    \item В основе системы типов языка Haskell лежит система Хиндли "--- Милнера.
+    \item Она изначально создана для вывода типов.
+          \pause
+    \item Даже без указания типов параметров.
+          \pause
+    \item Плюсы:
+          \begin{itemize}
+            \pause
+            \item Для любого данного выражения есть наиболее общий тип (если есть хоть какой-то).
+                  \pause
+            \item Есть эффективные (для реальных программ) алгоритмы их нахождения.
+          \end{itemize}
+          \pause
+    \item Не все расширения Haskell их сохраняют (но это один из критериев оценки расширений).
+          \pause
+    \item Минусы:
+          \begin{itemize}
+            \pause
+            \item Сложнее понять, как работает.
+                  \pause
+            \item Больше \enquote{дальнодействия}.
+          \end{itemize}
+          \pause
+    \item Поэтому понимание работы иногда необходимо.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Постановка задачи}
+  \begin{itemize}
+    \item Даны:
+          \begin{itemize}
+            \item Набор типов и конструкторов типов: \haskinline|Int|, \haskinline|Bool|, \haskinline|[]| и т.д.
+            \item Среди них особую роль играет конструктор функций \haskinline|->|.
+            \item Набор известных именованных функций (или констант) с их типами.
+            \item Выражение, тип которого мы хотим найти (обычно определение функции).
+          \end{itemize}
+          \pause
+    \item Нужно:
+          \begin{itemize}
+            \item Определить наиболее общий тип для этого выражения.
+                  \pause
+            \item Или найти объяснение, почему ему нельзя дать никакой тип.
+          \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\haskinline|let| и $\lambda$}
+  \begin{itemize}
+    \item Сравните \haskinline|let x = e!$_1$! in e!$_2$!| и \haskinline|(\x -> e!$_2$!) e!$_1$!|.
+          \pause
+    \item Для нерекурсивного \haskinline|let|, если оба выражения типизируются, их значения одинаковы.\pause
+    \item Пример: \haskinline|let x = 1 + 1 in x * x| и\\ \haskinline|(\x -> x * x) (1 + 1)|
+          \pause
+    \item Но есть разница при типизации: \pause \haskinline|x| в лямбде всегда мономорфна, а в \haskinline|let| может быть полиморфной.
+          \pause
+    \item Поэтому в нетипизированном и просто типизированном (то есть без полиморфных типов) $\lambda$-исчислении \haskinline|let| обычно не вводится.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Виды выражений и типов}
+  \begin{itemize}
+    \setlength{\itemsep}{0pt}
+    \item В нашей системе 5 видов выражений:\pause
+    \begin{itemize}
+      \item Названия переменных (в том числе функций) $x$
+      \item Применение функции к аргументу
+      \item Лямбда-выражения
+      \item \haskinline|let|-выражения
+      \item \haskinline|case|-выражения
+    \end{itemize}
+      \pause
+    \item \emph{Типы} $t$ (\emph{мономорфные типы}, \emph{монотипы}):
+          \pause
+    \begin{itemize}
+      \item Базовые типы \haskinline|Int|, \ldots
+      \item Переменные типов (греческие буквы $\alpha, \beta, \ldots$)
+      \item Тип функций $t_1 \to t_2$
+      \item Конструкторы типов: $\tMaybe~t$, $[t]$, $(t_1, t_2)$
+        \pause
+    \end{itemize}
+    \item \emph{Полиморфные типы} (\emph{политипы}): $\forall \alpha_1 \ldots \alpha_k~t$
+    \begin{itemize}
+      \item $\forall$ только на внешнем уровне, не под $\to$!
+      \item Переменные под $\forall$ \emph{связаны}, остальные \emph{свободны}.
+      \item При $k = 0$ "--- монотип, то есть все монотипы "--- политипы.
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+
+\begin{frame}[fragile]
+  \frametitle{Унификация}
+  \begin{itemize}
+    \item Нам понадобятся понятия подстановки и унификации. В общем случае:
+          \pause
+    \item Пусть даны два выражения (терма) какого-то формального языка (или несколько пар).
+    \item Они могут содержать переменные.
+          \pause
+    \item Подстановка переменных сопоставляет некоторым переменным выражения (которые тоже могут содержать переменные).
+          \pause
+    \item Мы хотим знать, можно ли сделать такую подстановку, чтобы термы стали одинаковыми.
+          \pause
+    \item Это достаточно широко применимое понятие.
+          \pause
+    \item Разрешимость задачи унификации и свойства решений зависят от структуры языка.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Подстановки}
+  \begin{itemize}
+    \item Подстановки $\sigma$ сопоставляют переменным типов $\alpha, \beta, \ldots$ монотипы (без $\forall$). Например, $\sigma_1 = \{\alpha \mapsto \tInt,\ \beta \mapsto \lst{\gamma}\}$, $\sigma_2 = \{\alpha \mapsto \beta,\ \beta \mapsto \tInt\}$.
+    \item Подстановку можно применить к монотипу (все замены сразу): $\sigma_1(\tMaybe~\beta) = \tMaybe~\lst{\gamma}$, $\sigma_2(\alpha, \beta) = (\beta, \tInt)$.
+    \item Композиция подстановок "--- подстановка (сначала применяем правую, потом левую): $\{\beta \mapsto \tInt\} \circ \{\alpha \mapsto \beta\} =\pause{} \{\alpha \mapsto \tInt,\ \beta \mapsto \tInt\}$.
+    \item Решения задач унификации будем записывать так, чтобы переменные слева не встречались справа: такие подстановки \emph{идемпотентны}, $\sigma(\sigma(t)) = \sigma(t)$.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Более общие типы и подстановки}
+  \begin{itemize}
+    \item Монотип $t_1$ \emph{более общий}, чем $t_2$ ($t_2$ "--- \emph{частный случай} $t_1$), если $t_2 = \sigma(t_1)$ для некоторой $\sigma$.
+          \pause
+    \item $(\alpha, \alpha)$ более общий, чем $(\tInt, \tInt)$, а $(\alpha, \beta)$ "--- чем $(\alpha, \alpha)$.
+          \pause
+    \item Вопрос: когда два типа более общи друг друга? \pause Когда они отличаются только названиями переменных.
+          \pause
+    \item Монотип $t'$ "--- \emph{экземпляр} политипа $\forall\bar\alpha.\,t$, если $t' = \sigma(t)$ для $\sigma$, меняющей только $\bar\alpha$.
+    \item $\tInt \to \tInt$ и $\beta \to \beta$ "--- экземпляры $\forall\alpha.\,\alpha \to \alpha$.
+          \pause
+    \item Так же для подстановок: $\sigma_1$ более общая, чем $\sigma_2$, если $\sigma_2 = \sigma \circ \sigma_1$ для некоторой $\sigma$.
+          \pause
+    \item $\{\alpha \mapsto \beta\}$ более общая, чем $\{\alpha \mapsto \tInt,\ \beta \mapsto \tInt\} = \{\beta \mapsto \tInt\} \circ \{\alpha \mapsto \beta\}$.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Унификация монотипов}
+  \begin{itemize}
+    \item В системе Хиндли "--- Милнера унифицируются монотипы: они равны, если совпадают синтаксически (синонимы уже раскрыты!).
+    \item Задача унификации: система уравнений $t_1 = s_1, \ldots$; решение "--- подстановка, после которой обе части каждого уравнения совпадают.
+          \pause
+    \item Пример: $(\alpha, \beta) = (\beta, \tInt)$. \pause $\{\alpha \mapsto \tInt,\ \beta \mapsto \tInt\}$ "--- решение, \pause и наиболее общее: все остальные "--- его частные случаи.
+          \pause
+    \item У каждой задачи унификации монотипов есть наиболее общее решение (или нет вообще). \pause Именно поэтому $\mathcal{J}$ находит наиболее общий тип.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Алгоритм унификации}
+  \begin{itemize}
+    \item Наиболее общее решение находится так:
+          \pause
+    \item На каждом шаге есть система уравнений. Выбираем любое из них и упрощаем.
+    \item Закончим, когда не останется упрощаемых уравнений (оставшиеся опишут подстановку).
+    \item Правило упрощения зависит от вида рассмотренного уравнения:
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Алгоритм унификации: правила (1)}
+  \begin{itemize}
+    \item $C~t_1~\ldots~t_k = C~s_1~\ldots~s_k$ (одинаковые конструкторы): \pause заменяется на $t_1 = s_1, \ldots, t_k = s_k$.
+          \pause
+          \begin{itemize}
+            \item $\tMaybe~\alpha = \tMaybe~\lst{\tInt}$ даёт $\alpha = \lst{\tInt}$.
+            \item $\alpha \to \beta = \tInt \to \tBool$ даёт $\alpha = \tInt$, $\beta = \tBool$: $\to$ "--- тоже конструктор с двумя аргументами.
+          \end{itemize}
+          \pause
+    \item $C~\ldots = D~\ldots$ (разные конструкторы): \pause унификатора не существует.
+          \pause
+          \begin{itemize}
+            \item $\tMaybe~\alpha = \lst{\beta}$, $\tInt \to \tInt = \tInt$.
+          \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Алгоритм унификации: правила (2)}
+  \begin{itemize}
+    \item $x=x$: \pause удаляется (можно обобщить и на $t=t$).
+          \pause
+    \item $x=t$ или $t=x$: два случая. \pause
+          \begin{itemize}
+            \item Если в $t$ нет переменной $x$: \pause во всех остальных уравнениях делаем замену $x \mapsto t$. Например, $\alpha = \lst{\beta}$.
+            \item Если есть\pause, то унификатора не существует: $\alpha = \lst{\alpha}$ требовало бы $\alpha = \mathtt{[[[}\ldots\mathtt{]]]}$. В GHC это ошибка вида \ghcinline|Couldn't match expected type ‘t1’ with actual type ‘t1 -> t2’|.
+          \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Унификация: пример}
+  \renewcommand{\arraystretch}{1.2}\small
+  \begin{tabular}{@{}l@{}}
+    $\{\,\alpha \to \beta = (\gamma \to \gamma) \to \lst{\gamma},\quad \beta = \lst{\tInt}\,\}$ \\
+    \onslide<2->{\quad\small одинаковые конструкторы ($\to$)} \\
+    \onslide<3->{$\{\,\alpha = \gamma \to \gamma,\quad \beta = \lst{\gamma},\quad \beta = \lst{\tInt}\,\}$} \\
+    \onslide<4->{\quad\small $\alpha = t$, $\alpha$ не входит в $t$: $\sigma = \{\alpha \mapsto \gamma \to \gamma\}$} \\
+    \onslide<5->{$\{\,\beta = \lst{\gamma},\quad \beta = \lst{\tInt}\,\}$} \\
+    \onslide<6->{\quad\small $\beta = t$: подстановка в остальные; $\sigma = \{\alpha \mapsto \gamma \to \gamma,\ \beta \mapsto \lst{\gamma}\}$} \\
+    \onslide<7->{$\{\,\lst{\gamma} = \lst{\tInt}\,\}$} \\
+    \onslide<8->{\quad\small одинаковые конструкторы ($\mathtt{[]}$)} \\
+    \onslide<9->{$\{\,\gamma = \tInt\,\}$} \\
+    \onslide<10->{\quad\small $\gamma \mapsto \tInt$, подставляем и в $\sigma$} \\
+    \onslide<11->{$\sigma = \{\,\alpha \mapsto \tInt \to \tInt,\quad \beta \mapsto \lst{\tInt},\quad \gamma \mapsto \tInt\,\}$} \\
+    \onslide<12->{\quad\small Проверка:} \onslide<13->{\small $(\tInt \to \tInt) \to \lst{\tInt}$ и $\lst{\tInt}$ с обеих сторон.} \\
+  \end{tabular}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Унификация: пример без решения}
+  \renewcommand{\arraystretch}{1.25}
+  \begin{tabular}{@{}l@{}}
+    $\{\,\alpha = \lst{\beta},\quad \beta = \tMaybe~\alpha\,\}$ \\
+    \onslide<2->{\quad\small $\alpha \mapsto \lst{\beta}$, подставляем во второе уравнение} \\
+    \onslide<3->{$\{\,\beta = \tMaybe~\lst{\beta}\,\}$} \\
+    \onslide<4->{\quad\small $\beta$ входит в правую часть: решения нет.} \\
+  \end{tabular}
+  \onslide<5->{
+    \begin{itemize}
+      \item Occurs check срабатывает не сразу, а после подстановки.
+      \item Это в миниатюре \haskinline|f3 x = x x| со слайда с примерами.
+    \end{itemize}
+  }
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Алгоритм $\J$ вывода типов}
+  \begin{itemize}
+    \item $\Gamma$ "--- окружение: переменные с их политипами.
+    \item $\J(\Gamma; e)$ возвращает наиболее общий монотип для $e$ в $\Gamma$ или ошибку (обобщение "--- только в \haskinline|let|).
+          \pause
+    \item $\phi$ "--- глобальная изменяемая переменная с уже сделанными подстановками, так что $\J$ "--- не чистая функция!\pause
+    \item Можем её избежать, возвращая подстановки явно. Это алгоритм $\mathcal{W}$ (ссылки в конце презентации).
+    \item Функция $\fresh$ («свежая переменная» в правилах) возвращает переменную типа, которой ещё нигде не было. Тоже не чистая.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Алгоритм $\J$: приведение определений и выражений к стандартному виду}
+  \begin{itemize}
+    \item Переименуем связанные переменные с одинаковыми именами.
+          \begin{itemize}
+            \item Переменная, введённая $\lambda$, \haskinline|let| или образцом, "--- \emph{связанная}; остальные "--- \emph{свободные}, их типы берутся из $\Gamma$.
+          \end{itemize}
+    \item Заменим \haskinline|where| на \haskinline|let|.
+    \item Заменим \haskinline|if| и сопоставления с образцом в уравнениях на \haskinline|case|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Приведение к стандартному виду: пример}
+  \begin{itemize}
+    \item Пример:
+          \begin{haskellsmall}
+            not' True  = False
+            not' False = True
+
+            g x = h x where h x = not' x
+          \end{haskellsmall}
+          \pause
+          превращается в
+          \begin{haskellsmall}
+            not' = \x -> case x of
+                True  -> False
+                False -> True
+
+            g = \x -> let h = \y -> not' y in h x
+          \end{haskellsmall}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Алгоритм $\J$: переменная}
+  \begin{itemize}
+    \item Переменная $x$: тип берётся из окружения (если $x$ там нет, это ошибка типизации).
+    \item Если это политип, берём его экземпляр со свежими переменными (самый общий из экземпляров).
+          \pause
+    \item Примеры (в $\Gamma$: $\mathtt{not} : \tBool \to \tBool$, $\mathtt{id} : \forall\alpha.\,\alpha \to \alpha$; числовые литералы до обсуждения классов типов считаем $\tInt$):
+          \begin{itemize}
+            \item \haskinline|not|: $\tBool \to \tBool$ как есть.
+                  \pause
+            \item \haskinline|id|: \pause $\alpha_1 \to \alpha_1$; второе вхождение \haskinline|id| в том же выражении "--- $\alpha_2 \to \alpha_2$. Каждое использование типизируется независимо.
+          \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Алгоритм $\J$: применение}
+  \begin{itemize}
+    \item Применение функции $e_1~e_2$:
+          \begin{itemize}
+            \item Пусть $t_1 = \J(\Gamma; e_1)$ и $t_2 = \J(\Gamma; e_2)$ (то есть выводим типы для $e_1$ и $e_2$ и так их обозначаем).
+            \item $t_1$ должен иметь вид $t_2 \to \alpha$ (где $\alpha$ "--- свежая переменная). Унифицируем их.
+            \item Результат (тип $e_1~e_2$): \pause $\alpha$ (после подстановок).
+          \end{itemize}
+          \pause
+    \item Примеры:
+          \begin{itemize}
+            \item \haskinline|not True|: \pause $t_1 = \tBool \to \tBool$, $t_2 = \tBool$; унифицируем $\tBool \to \tBool = \tBool \to \alpha$: \pause $\alpha = \tBool$.
+                  \pause
+            \item \haskinline|id id|: \pause $t_1 = \alpha_1 \to \alpha_1$, $t_2 = \alpha_2 \to \alpha_2$; унифицируем $\alpha_1 \to \alpha_1 = (\alpha_2 \to \alpha_2) \to \alpha$: \pause $\alpha_1 = \alpha_2 \to \alpha_2$, $\alpha = \alpha_2 \to \alpha_2$. Результат \pause $\alpha_2 \to \alpha_2$.
+                  \pause
+            \item \haskinline|not id|: \pause унифицируем $\tBool \to \tBool = (\alpha_2 \to \alpha_2) \to \alpha$; \pause нужно $\tBool = \alpha_2 \to \alpha_2$, а это разные конструкторы: ошибка типа.
+          \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Алгоритм $\J$: лямбда-выражение}
+  \begin{itemize}
+    \item Лямбда-выражение $\lambda x.e_1$:
+          \begin{itemize}
+            \item Тип $x$ "--- свежая переменная $\alpha$.
+            \item $t_1 = \J(\Gamma, x : \alpha; e_1)$.
+            \item Результат: \pause $\alpha \to t_1$.
+          \end{itemize}
+          \pause
+    \item Примеры:
+          \begin{itemize}
+            \item \haskinline|\x -> not x|: \pause $x : \alpha$; для \haskinline|not x| унифицируем $\tBool \to \tBool = \alpha \to \beta$: $\alpha = \tBool$, $\beta = \tBool$. Результат \pause $\alpha \to \beta = \tBool \to \tBool$.
+                  \pause
+            \item \haskinline|\x -> x|: \pause $x : \alpha$, результат $\alpha \to \alpha$. Без $\forall$: обобщение делает только \haskinline|let|.
+          \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Алгоритм $\J$: \haskinline|let|}
+  \begin{itemize}
+    \item \haskinline|let|-выражение \haskinline|let !$x$! = !$e_1$! in !$e_2$!|:
+          \begin{itemize}
+            \item $t_1 = \J(\Gamma; e_1)$.
+            \item Политип $x$ получается навешиванием $\forall$ на свободные переменные типов $\phi(t_1)$, не входящие свободно в $\phi(\Gamma)$; обозначим их $\bar\alpha$.
+            \item $t_2 = \J(\Gamma, x : \forall\bar\alpha.\,\phi(t_1); e_2)$.
+            \item Результат: \pause $t_2$.
+          \end{itemize}
+          \pause
+    \item Пример: \haskinline|let f = \x -> x in (f 1, f True)|.
+          \begin{itemize}
+            \item $t_1 = \alpha \to \alpha$, $\alpha$ нет в $\Gamma$, поэтому $f : \forall\alpha.\,\alpha \to \alpha$.
+                  \pause
+            \item В теле \haskinline|f 1| даёт \pause $\tInt$, \haskinline|f True| "--- $\tBool$; результат \pause $(\tInt, \tBool)$.
+                  \pause
+            \item А \haskinline|(\f -> (f 1, f True)) (\x -> x)| \pause не типизируется: $f : \beta$ мономорфна, и $\beta$ пришлось бы унифицировать и с $\tInt \to \gamma_1$, и с $\tBool \to \gamma_2$.
+          \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Алгоритм $\J$: \haskinline|let| и переменные из $\Gamma$}
+  \begin{itemize}
+    \item Пример:
+          \begin{haskell}
+            \x -> let f = \y -> (y, x)
+                  in (f 1, f True)
+          \end{haskell}
+          \pause
+          \begin{itemize}
+            \item $x : \alpha$ попадает в $\Gamma$ для \haskinline|let ...|; $t_1 = \beta \to (\beta, \alpha)$.
+                  \pause
+            \item Свободные переменные типов $t_1$ "--- \pause $\alpha$ и $\beta$, но $\alpha$ входит в $\phi(\Gamma)$: обобщаем только \pause $\beta$, $f : \forall\beta.\,\beta \to (\beta, \alpha)$.
+                  \pause
+            \item \haskinline|f 1| $: (\tInt, \alpha)$, \haskinline|f True| $: (\tBool, \alpha)$; вся лямбда "--- $\alpha \to ((\tInt, \alpha), (\tBool, \alpha))$.
+          \end{itemize}
+          \pause
+    \item Если бы обобщили и $\alpha$, \haskinline|f| могла бы вернуть \haskinline|x| любого типа, хотя тип \haskinline|x| задан снаружи.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Алгоритм $\J$: рекурсивный \haskinline|let|}
+  \begin{itemize}
+    \item Особый случай: рекурсивный \haskinline|let| ($x$ входит в $e_1$). \pause
+          \begin{itemize}
+            \item \haskinline|fix f| возвращает неподвижную точку \haskinline|f| (т.е. \haskinline|f (fix f)| $=$ \haskinline|fix f|). \pause
+            \item Соответственно, её тип \haskinline|fix ::!\pause! forall a. (a -> a) -> a|. \pause
+            \item \haskinline|let x = !$e_1$! in !$e_2$!| превращается в \haskinline|let x = fix (\x -> !$e_1$!) in !$e_2$!|.
+            \item Этот \haskinline|let| не рекурсивный: \pause \haskinline|x| в \haskinline|let x = ...| и в \haskinline|\x -> !$e_1$!| "--- разные!
+          \end{itemize}
+          \pause
+    \item Пример: \haskinline|let ones = 1 : ones in ...| $\leadsto$ \pause \haskinline|fix (\ones -> 1 : ones)|.
+          \begin{itemize}
+            \item Внутри лямбды $\mathit{ones} : \alpha$; с $(:) : \forall\beta.\,\beta \to \lst{\beta} \to \lst{\beta}$ в $\Gamma$ тип \haskinline|1 : ones| \pause "--- $\lst{\tInt}$, причём $\alpha = \lst{\tInt}$.
+                  \pause
+            \item Лямбда: $\lst{\tInt} \to \lst{\tInt}$; \haskinline|fix| даёт $\lst{\tInt}$.
+          \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Алгоритм $\J$: \haskinline|case|}
+  \begin{itemize}
+    \item \haskinline|case !$e$! of !$pat_1$! -> !$body_1$!; !$pat_2$! -> !$body_2$!; ...|
+          \pause
+          \begin{itemize}
+            \item $t = \J(\Gamma; e)$.
+            \item Для каждой ветви:
+                  \begin{itemize}
+                    \item $\Gamma_i$ "--- $\Gamma$ со свежими типами для переменных $pat_i$;
+                    \item тип $pat_i$ унифицируем с $t$;
+                    \item $t_i = \J(\Gamma_i; body_i)$.
+                  \end{itemize}
+            \item Унифицируем все $t_i$. Результат: \pause $t_1$.
+          \end{itemize}
+          \pause
+    \item Пример: \haskinline|\m -> case m of|\\
+          \hphantom{Пример: }\haskinline|  Nothing -> 1|\\
+          \hphantom{Пример: }\haskinline|  Just x  -> x|
+          \begin{itemize}
+            \item $m : \alpha$. Ветвь 1: \pause \haskinline|Nothing| имеет тип $\tMaybe~\beta_1$, унифицируем с $\alpha$; тело "--- $\tInt$.
+                  \pause
+            \item Ветвь 2: \pause $x : \beta_2$, образец \haskinline|Just x| "--- $\tMaybe~\beta_2$, унифицируем с $\tMaybe~\beta_1$: $\beta_1 = \beta_2$; тело "--- $\beta_2$.
+                  \pause
+            \item Унифицируем тела: \pause $\beta_2 = \tInt$, значит $\alpha = \tMaybe~\tInt$; итог "--- \pause $\tMaybe~\tInt \to \tInt$.
+          \end{itemize}
+  \end{itemize}
+\end{frame}
+
+%\begin{frame}[fragile]
+%\frametitle{Алгоритм $\J$: рекурсия по определению $e$ (формально)}
+%\begin{itemize}
+%    \item 
+%\begin{haskell}
+%$\J(\Gamma; x)$ = do
+%  $\forall \alpha_1\ldots\alpha_k t = \phi(\Gamma(x))$
+%  return $t[\alpha_1 \mapsto \fresh,\ldots,\alpha_k \mapsto \fresh]$
+%\end{haskell}
+%    \item[] \pause
+%    \item 
+%\begin{haskell}
+%$\J(\Gamma; e_1~e_2)$ = do
+%  $t_1 = \J(\Gamma; e_1)$
+%  $t_2 = \J(\Gamma; e_2)$
+%  $\alpha = \fresh$
+%  $\phi := \mathord{\mathit{unify}}(t_1 = t_2 \to \alpha) \circ \phi$
+%  return $\phi(\alpha)$
+%\end{haskell}
+%\end{itemize}
+%\end{frame}
+%
+%\begin{frame}[fragile]
+%\frametitle{Алгоритм $\J$: рекурсия по определению $e$ (формально)}
+%\begin{itemize}
+%\item 
+%\begin{haskell}
+%$\J(\Gamma; \lambda x.e_1)$ = do
+%  $\alpha = \fresh$
+%  $t = \J(\Gamma, x:\alpha; e_1)$
+%  return $\phi(\alpha \to t)$
+%\end{haskell}
+%    \item[] \pause
+%\item 
+%\begin{haskell}
+%$\J(\Gamma; \mathtt{let}~x=e_1~\mathtt{in}~e_2)$ = do
+%  $t_1 = \J(\Gamma; e_1)$
+%  $\Gamma_1 = \phi(\Gamma)$
+%  $fv = ftv(t_1) \setminus ftv(\Gamma_1)$
+%  $t_2 = \forall fv.t_1$
+%  return $\J(\Gamma_1, x:t_2; e_2)$
+%\end{haskell}
+%\end{itemize}
+%\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Примеры}
+  \begin{itemize}
+    \item Определения уровня модуля обрабатываем как $e_1$ в \haskinline|let| $e_1$ \haskinline|in| $e_2$: выводим тип, обобщаем, добавляем в $\Gamma$ для следующих определений.
+          \pause
+    \item Разберём несколько примеров
+          \pause
+    \item Без \haskinline|let|:
+          \begin{haskellsmall}
+            f1 = (.) (.) !\pause!
+            f1 :: (a1 -> b -> c) -> a1 -> (a2 -> b) -> a2 -> c
+          \end{haskellsmall}
+          \pause
+    \item C \haskinline|let|-полиморфизмом:
+          \begin{haskellsmall}
+            f2 x = let pair x = (x,x) in pair (pair x) !\pause!
+            f2 :: b -> ((b, b), (b, b))
+          \end{haskellsmall}
+          \pause
+    \item Пример ошибки типа:
+          \begin{haskellsmall}
+            f3 x = x x !\pause!
+          \end{haskellsmall}
+          \begin{ghcismall}
+            Couldn't match expected type ‘t1’
+                        with actual type ‘t1 -> t2’
+          \end{ghcismall}
+          (тип \haskinline|x| был бы бесконечным).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{А как же классы типов?}
+  \begin{itemize}
+    \item Мы выводили типы без ограничений, но \haskinline|1 + x| требует \haskinline|Num|.
+          \pause
+    \item Расширение системы Хиндли "--- Милнера "--- \emph{квалифицированные типы}: кроме подстановки $\phi$ накапливается набор ограничений; при обобщении в \haskinline|let| они попадают в контекст: \haskinline|Num a => a -> a|.
+          \pause
+    \item Реализация "--- передача \enquote{словарей}: \haskinline|Num a => a -> a| компилируется примерно в \haskinline|NumDict a -> a -> a|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Классы типов: пример}
+  \begin{itemize}
+    \item Выведем тип \haskinline|\x -> x + 1|. В $\Gamma$: $(+) : \forall\alpha.\,\tNum~\alpha \Rightarrow \alpha \to \alpha \to \alpha$, $1 : \forall\alpha.\,\tNum~\alpha \Rightarrow \alpha$.
+          \pause
+          \begin{itemize}
+            \item $(+)$: $\alpha_1 \to \alpha_1 \to \alpha_1$, в набор ограничений $C$ добавляется $\tNum~\alpha_1$.
+                  \pause
+            \item $x : \beta$; \haskinline|x + 1| это \haskinline|(+) x 1|. Унифицируем $\alpha_1 \to \alpha_1 \to \alpha_1 = \beta \to \gamma$: $\beta = \alpha_1$, $\gamma = \alpha_1 \to \alpha_1$.
+                  \pause
+            \item $1$: $\alpha_2$, в $C$ добавляется $\tNum~\alpha_2$. Унифицируем $\alpha_1 \to \alpha_1 = \alpha_2 \to \delta$: $\alpha_2 = \alpha_1$, $\delta = \alpha_1$.
+                  \pause
+            \item Лямбда: $\alpha_1 \to \alpha_1$; после подстановки $C = \{\tNum~\alpha_1\}$.
+                  \pause
+            \item Обобщение: ограничения на $\alpha_1$ уходят в контекст "--- \haskinline|Num a => a -> a|.
+          \end{itemize}
+          \pause
+    \item А для \haskinline|True + 1| получаем $\alpha_1 = \tBool$ и $\tNum~\tBool$ без экземпляра "--- ошибка \ghcinline|No instance for ‘Num Bool’| из лекции 1.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Неоднозначные типы и умолчания}
+  \begin{itemize}
+    \item Проблема: если переменная типа осталась \emph{только} в ограничениях, тип неоднозначен. Какой тип у \haskinline|read s| в \haskinline|show (read s)|?
+          \pause
+    \item Для числовых классов есть правило умолчания (defaulting): пробуются \haskinline|Integer|, затем \haskinline|Double|. Отсюда предупреждение \ghcinline|Defaulting the type variable ‘a0’ to type ‘Integer’ in the following constraints| и то, что \haskinline|2^64| в GHCi "--- \haskinline|Integer|, а не \haskinline|Int|.
+          \pause
+    \item В GHCi действуют расширенные правила умолчания (\href{https://downloads.haskell.org/~ghc/latest/docs/users_guide/ghci.html#extension-ExtendedDefaultRules}{\haskinline|ExtendedDefaultRules|}): например, для \haskinline|print []| тип элементов выбирается как \haskinline|()|, а в файле это ошибка \ghcinline|Ambiguous type variable|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Алгоритм $\Malg$: сверху вниз}
+  \begin{itemize}
+    \item Алгоритм $\Malg$ (\href{https://ropas.snu.ac.kr/~kwang/paper/98-toplas-leyi.pdf}{Lee, Yi, 1998}) идёт сверху вниз: $\Malg(\Gamma; e; \rho)$ получает \emph{ожидаемый} тип $\rho$ и передаёт его подвыражениям; унификация выполняется для переменных и лямбд.
+          \pause
+    \item Переменная $x$: унифицируем $\rho$ с типом $x$ из $\Gamma$ (после замены переменных под $\forall$ на свежие).
+    \item Применение $e_1~e_2$: свежая $\beta$; $\Malg(\Gamma; e_1; \beta \to \rho)$, затем $\Malg(\Gamma; e_2; \beta)$.
+    \item Лямбда $\lambda x.e_1$: свежие $\alpha$, $\beta$; унифицируем $\rho = \alpha \to \beta$; $\Malg(\Gamma, x : \alpha; e_1; \beta)$.
+    \item \haskinline|let !$x$! = !$e_1$! in !$e_2$!|: свежая $\beta$; $\Malg(\Gamma; e_1; \beta)$; обобщаем $\phi(\beta)$ как в $\J$; $\Malg(\Gamma, x : \forall\bar\alpha.\,\phi(\beta); e_2; \rho)$.
+    \item Для всего выражения: $\Malg(\Gamma; e; \alpha)$ со свежей $\alpha$; ответ "--- $\phi(\alpha)$.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Алгоритм $\Malg$: пример и следствия}
+  \begin{itemize}
+    \item \haskinline|not id| с ожидаемым $\rho$: для \haskinline|not| унифицируем $\tBool \to \tBool = \beta \to \rho$, получаем $\beta = \tBool$; для \haskinline|id| унифицируем $\alpha_1 \to \alpha_1 = \tBool$ "--- ошибка \emph{на} \haskinline|id|.
+          \pause
+    \item Ошибка обнаруживается раньше, чем в $\J$ (доказано в статье); здесь "--- при проверке \haskinline|id|.
+    \item Так же устроены сообщения GHC: \emph{expected type} "--- тип, переданный сверху, \emph{actual type} "--- выведенный для подвыражения.
+          \pause
+    \item Типы и множество принимаемых программ те же, что у $\J$ и $\mathcal{W}$.
+    \item «Ожидаемый тип как вход» "--- начало двунаправленного вывода типов (см. дополнительное чтение).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Дополнительное чтение}
+  \begin{itemize}
+    \item Алгоритм $\mathcal{W}$ "--- то же без глобальной $\phi$; он известнее и удобнее для доказательств.
+    \begin{itemize}
+      \item Реализация на Haskell: \href{https://github.com/mgrabmueller/AlgorithmW}{Algorithm W Step by Step}.
+      \item Оба алгоритма на Python: \href{https://bernsteinbear.com/blog/type-inference/}{Damas-Hindley-Milner inference two ways}.
+      \item В обоих есть ещё дополнительные материалы.
+    \end{itemize}
+    \item \href{https://smunix.github.io/dev.stephendiehl.com/fun/006_hindley_milner.html}{Глава Hindley-Milner Inference в незаконченной книге Write You a Haskell}
+    \item Реализация системы типов всего (!) стандарта Haskell 98 с выводом, основанная на $\J$, есть в \href{https://gist.github.com/chrisdone/0075a16b32bfd4f62b7b}{Typing Haskell in Haskell}.
+    \item \href{https://compsciclub.ru/courses/types/2019-spring/classes/}{Курс лекций В.~Н.~Брагилевского "Вывод типов от Хиндли — Милнера до GHC 8.8"  (есть видео)}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Дополнительное чтение: современный взгляд}
+  \begin{itemize}
+    \item \href{https://cambium.inria.fr/~fpottier/publis/fpottier-appsem-2005.pdf}{F.~Pottier, A modern eye on ML type inference (2005)}: вывод типов как решение ограничений; уровни для быстрого обобщения.
+    \item \href{https://okmij.org/ftp/ML/generalization.html}{O.~Kiselyov, How OCaml type checker works}: уровни в реальном компиляторе.
+    \item \href{https://simon.peytonjones.org/outsideinx/}{OutsideIn(X) (2011)}: вывод в GHC (ограничения и импликации); когда и почему ограничивается обобщение локальных \haskinline|let|.
+    \item \href{https://arxiv.org/abs/1908.05839}{J.~Dunfield, N.~Krishnaswami, Bidirectional Typing (2021)}: когда без аннотаций не обойтись (полиморфизм высших рангов).
+  \end{itemize}
+\end{frame}
+
+\end{document}

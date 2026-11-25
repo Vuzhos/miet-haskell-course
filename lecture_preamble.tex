@@ -1,0 +1,80 @@
+\usepackage[utf8]{inputenc}
+\usepackage[T1,T2A]{fontenc}
+\usepackage[russian]{babel}
+\usepackage{color}
+\usepackage{calc}
+\usepackage{graphicx}
+\usepackage{epstopdf}
+\usepackage{hyperref}
+\hypersetup{unicode,colorlinks}
+\usetheme[progressbar=head,numbering=fraction,block=fill]{metropolis}
+\usepackage{minted}
+\usepackage{dejavu}
+%\usepackage{adjustbox}  % Позволяет сузить куски кода (или текст) ровно настолько, чтобы уместиться в слайд
+\usepackage{csquotes}
+\usepackage{upquote}
+
+\usemintedstyle{solarized-light}
+\newminted[haskell]{haskell}{
+    escapeinside=!!,
+    mathescape=true,
+    texcomments=true,
+    beameroverlays=true,
+    autogobble=true,
+    fontsize=\small,
+    breaklines=false  % Лучше сам поставлю переносы на удобных местах
+}
+\newminted[haskellsmall]{haskell}{
+    escapeinside=!!,
+    mathescape=true,
+    texcomments=true,
+    beameroverlays=true,
+    autogobble=true,
+    fontsize=\footnotesize,
+    breaklines=false
+}
+\newminted[haskelltiny]{haskell}{
+    escapeinside=!!,
+    mathescape=true,
+    texcomments=true,
+    beameroverlays=true,
+    autogobble=true,
+    fontsize=\scriptsize,
+    breaklines=false
+}
+\newmintinline[haskinline]{haskell}{
+    escapeinside=!!,
+    mathescape=true,
+    beameroverlays=true,
+    breaklines=true
+}
+\newminted[ghci]{text}{
+    autogobble=true,
+    fontsize=\small,
+    breaklines=false
+}
+\newminted[ghcismall]{text}{
+    autogobble=true,
+    fontsize=\footnotesize,
+    breaklines=false
+}
+\newminted[ghcitiny]{text}{
+    autogobble=true,
+    fontsize=\scriptsize,
+    breaklines=false
+}
+\newmintinline[ghcinline]{text}{
+    breaklines=true
+}
+
+\newcommand{\hackage}[1]{\href{https://hackage.haskell.org/package/#1}{#1}}
+
+\vfuzz=20pt  % позволяет тексту дойти до номера слайда
+
+\author{Алексей Романов}
+\subtitle{Функциональное программирование на Haskell}
+%\logo{}
+\institute{МИЭТ}
+\subject{Функциональное программирование на Haskell}
+%\setbeamercovered{transparent}
+%\setbeamertemplate{navigation symbols}{}

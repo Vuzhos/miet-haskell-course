@@ -1,0 +1,360 @@
+\documentclass[10pt]{beamer}
+\input{lecture_preamble.tex}
+
+\title{Лекция 5: функции как значения}
+
+\begin{document}
+\begin{frame}[plain]
+  \maketitle
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Функции как значения}
+  \begin{itemize}
+    \item Как упоминалось в начале курса, одно из оснований ФП состоит в том, что функции могут использоваться как значения.
+    \item В Haskell можно выразиться сильнее:\pause
+    \item Функции это и есть просто значения, тип которых имеет форму \haskinline|ТипПараметра -> ТипРезультата| для каких-то \haskinline|ТипПараметра| и \haskinline|ТипРезультата|.\pause
+    \item Мы уже видели примеры этого в равноправии функций и \only<4>{\textbf{других} }переменных.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Функции высших порядков}
+  \begin{itemize}
+    \item Функции могут принимать на вход функции.
+    \item Тривиальный пример:
+          \begin{haskell}
+            import Data.Char (isLetter, toLower)
+
+            foo :: (Char -> Bool) -> Bool
+            foo f = f 'a'
+
+            ghci> foo isLetter !\pause!
+            True
+          \end{haskell}
+    \item Скобки вокруг типа параметра здесь необходимы.\pause
+    \item В других языках \emph{функциями высших порядков (ФВП)} называют функции, аргументы или результаты которых тоже функции.\pause
+    \item Функция второго порядка принимает или возвращает обычную функцию (первого порядка) и так далее.\pause
+    \item В этой лекции ФВП называем только функции, принимающие функции. Почему "--- увидим позже.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Лямбда-выражения}
+  \begin{itemize}
+    \item В \haskinline|foo| с прошлого слайда можем также передать свою новую функцию, определив её локально:
+          \begin{haskell}
+            bar = foo isCyrillic where
+                isCyrillic c = let lc = toLower c
+                               in 'а' <= lc && lc <= 'я'
+          \end{haskell}
+\pause
+    \item Но имя этой функции на самом деле не нужно.
+    \item Как и вообще функциям, которые создаются только как аргументы для других (или как результаты).\pause
+    \item Вместо этого зададим её через \emph{лямбда-выражение}
+          \begin{haskell}
+            bar = foo (\c -> let lc = toLower c
+                             in 'а' <= lc && lc <= 'я')
+          \end{haskell}
+          \pause
+    \item[]
+    \item Кстати, почему это определение неверно?
+          \pause
+    \item Как ни странно, в Юникоде \haskinline|'ё' > 'я'|.
+    \item И не все буквы кириллицы используются в русском.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Лямбда-выражения}
+  \begin{itemize}
+    \item Вообще, два определения
+          \begin{haskell}
+            функция образец = результат
+
+            функция = \образец -> результат
+          \end{haskell}
+          эквивалентны.\pause
+    \item Одно исключение: \href{https://wiki.haskell.org/Monomorphism_restriction}{для второго может быть выведен менее общий тип}.\pause
+    \item Лямбда-выражение для функции с несколькими параметрами пишется
+          \begin{haskell}
+            \образец1 ... образецN -> результат
+          \end{haskell}
+          \pause
+    \item Например,
+          \begin{haskell}
+            import Data.List (sortBy)
+
+            sortBy (\x y -> compare y x) list
+          \end{haskell}
+    \item Что делает это выражение?\pause
+    \item Сортирует список по убыванию.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Лямбда-выражения и \haskinline|case|}
+  \begin{itemize}
+    \item Если в обычном определении функции несколько уравнений, например
+          \begin{haskell}
+            not' True  = False
+            not' False = True
+          \end{haskell}
+          то в лямбда-выражении придётся использовать \haskinline|case|:\pause
+          \begin{haskell}
+            not' = \x -> case x of
+                True  -> False
+                False -> True
+          \end{haskell}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Несколько стандартных ФВП}
+  \begin{itemize}
+    \item В \haskinline|Prelude| есть три функции второго порядка, которые очень часто встречаются в коде Haskell:
+          \begin{haskell}
+            ($) :: (a -> b) -> a -> b
+            f $ x =!\pause! f x!\pause!
+
+            (.) :: (b -> c) -> (a -> b) -> (a -> c)
+            g . f =!\pause! \x ->!\pause! g (f x)
+
+            flip :: (a -> b -> c) -> (b -> a -> c)
+            flip f = !\pause! \y x ->!\pause! f x y
+          \end{haskell}
+    \item И ещё две в \haskinline|Data.Function|:
+          \begin{haskell}
+            (&) :: a -> (a -> b) -> b
+            x & f =!\pause! f x   -- то есть (\&) = flip (\$)
+
+            on :: (b -> b -> c) -> (a -> b) -> 
+                (a -> a -> c)
+            on op f x y = op (f x) (f y)
+          \end{haskell}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Избавление от скобок с помощью \haskinline|$| и \haskinline|.|}
+  \begin{itemize}
+    \item Казалось бы, в чём смысл \haskinline|$|: зачем писать \haskinline|f $ x| вместо \haskinline|f x|?\pause
+    \item Этот оператор имеет минимальный возможный приоритет, так что \haskinline|f (x + y)| можно записать как \haskinline|f $ x + y|.\pause
+    \item И он правоассоциативен, так что \haskinline|f (g (h x))| можно записать как \haskinline|f $ g $ h x|.\pause
+    \item Но более принято \haskinline|f . g . h $ x|.\pause
+    \item \haskinline|.| тоже правоассоциативен, но уже с максимальным приоритетом.\pause
+    \item[]
+    \item Пока, наверное, проще читать и писать код со скобками, но стандартный стиль Haskell предпочитает их избегать.
+    \item Только не перестарайтесь!
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Правда о функциях многих переменных}
+  \begin{itemize}
+    \item Настала пора раскрыть тайну функций многих переменных в Haskell:\pause
+    \item Их не существует.\pause
+    \item \haskinline|->| "--- правоассоциативный оператор, так что \haskinline|Тип1 -> Тип2 -> Тип3| это на самом деле \haskinline|Тип1 -> (Тип2 -> Тип3)|: функция, возвращающая функцию.\pause
+    \item \haskinline|\x y -> результат| это сокращение для \haskinline|\x -> \y -> результат|, а со скобками \haskinline|\x -> (\y -> результат)|.\pause
+    \item Применение функций (не \haskinline|$|, а пробел), наоборот, левоассоциативно. То есть \haskinline|f x y| читается как \haskinline|(f x) y|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Каррирование}
+  \begin{itemize}
+    \item Обычно в математике для сведения функций нескольких аргументов к функциям одного аргумента используется декартово произведение: $A \times B \to C$, а не $A \to (B \to C)$.\pause
+    \item В Haskell тоже можно было бы писать
+          \begin{haskell}
+            foo :: (Int, Int) -> Int
+            foo (x, y) = x + y
+          \end{haskell}
+          для определения функций и \haskinline|foo (1, 2)| для вызова.\pause
+    \item Но Haskell здесь следует традиции $\lambda$-исчисления.\pause
+    \item Эти подходы эквивалентны, так как множества $A \times B \to C$ и $A \to (B \to C)$ всегда изоморфны \pause ($C^{A \cdot B} = (C^B)^A$).
+    \item В Haskell этот изоморфизм реализуют функции\pause
+          \begin{haskell}
+            curry :: ((a, b) -> c) -> a -> b -> c
+            uncurry :: (a -> b -> c) -> (a, b) -> c
+          \end{haskell}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Частичное применение}
+  \begin{itemize}
+    \item Преимущество каррированных функций в том, что естественным образом появляется частичное применение.
+    \item То есть мы можем применить функцию \enquote{двух аргументов} только к первому и останется функция одного аргумента:
+          \begin{haskell}
+            ghci> :t sortBy
+            sortBy :: (a -> a -> Ordering) -> [a] -> [a]
+            ghci> :t sortBy (flip compare) !\pause!
+            sortBy (flip compare) :: Ord a => [a] -> [a]
+          \end{haskell}
+          \pause
+    \item Заметьте, что здесь частичное применение в двух местах: \pause\haskinline|flip| можно теперь рассматривать как функцию трёх аргументов!
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Сечения операторов}
+  \begin{itemize}
+    \item Для применения бинарного оператора только к первому аргументу можно использовать его префиксную форму:
+          \begin{haskell}
+            ghci> :t (+) 1
+            (+) 1 :: Num a => a -> a
+          \end{haskell}
+          \pause
+    \item А ко второму? Можно использовать лямбду
+          \begin{haskell}
+            \x -> x / 2
+          \end{haskell}
+          или \haskinline|flip|
+          \begin{haskell}
+            flip (/) 2
+          \end{haskell}
+          \pause
+    \item Но есть специальный синтаксис \haskinline|(арг оп)| и \haskinline|(оп арг)|:
+          \begin{haskell}
+            ghci> (1 `div`) 2 !\pause!
+            0
+            ghci> (/ 2) 4 !\pause!
+            2.0
+          \end{haskell}
+          \pause
+    \item Ловушка: \haskinline|(- 2)| "--- это число $-2$, а не сечение. Для вычитания есть \haskinline|subtract 2|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Сечения кортежей}
+  \begin{itemize}
+    \item Конструкторы кортежей тоже можно применять частично (\haskinline|TupleSections|, входит в GHC2021):
+          \begin{haskell}
+            ghci> (, "I", , "Love", True) 1 False !\pause!
+            (1,"I",False,"Love",True)
+            ghci> :t (, "I", , "Love", True) !\pause!
+            (, "I", , "Love", True)
+              :: t1 -> t2 -> (t1, String, t2, String, Bool)
+          \end{haskell}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{$\eta$-эквивалентность (сокращение аргументов)}
+  \begin{itemize}
+    \item Рассмотрим два определения
+          \begin{haskell}
+            foo' x = foo x
+            -- или foo' = \textbackslash x -> foo x 
+          \end{haskell}
+    \item Применение обоих определений к одному аргументу задаёт одно и то же вычисление.\pause
+    \item Поэтому обычно можно сократить аргумент:
+          \begin{haskell}
+            foo' = foo
+          \end{haskell}
+\pause
+    \item Оговорка: удаление лямбды может изменить поведение при использовании \haskinline|seq| (подробнее в лекции о ленивости).
+    \item Можно сокращать и несколько аргументов в конце:
+          \begin{haskell}
+            foo' x y z w = foo (y + x) z w
+          \end{haskell}
+          эквивалентно
+          \begin{haskell}
+            foo' x y = foo (y + x)
+          \end{haskell}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{$\eta$-эквивалентность (сокращение аргументов)}
+  \begin{itemize}
+    \item И когда само определение такой формы не имеет, но может быть к ней преобразовано
+          \begin{haskell}
+            root4 :: Floating a => a -> a
+            root4 x = sqrt (sqrt x)
+          \end{haskell}
+          можно переписать (сохраняя сигнатуру) как
+          \begin{haskell}
+            root4 x = (sqrt . sqrt) x
+
+            root4 = sqrt . sqrt
+          \end{haskell}
+    \item Ещё пример:
+          \begin{haskell}
+            ($) :: (a -> b) -> a -> b
+            f $ x = f x
+
+            ($) f x = f x !\pause!
+            ($) f = f !\pause!
+            ($) f = id f !\pause!
+            ($) = id
+          \end{haskell}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Бесточечный стиль}
+  \begin{itemize}
+    \item Композиция и другие операции позволяют определять функции без явного указания аргументов.
+    \item Это называется \emph{бесточечным стилем} (переменные рассматриваются как точки в пространстве значений).\pause
+    \item Многие выражения имеют бесточечный эквивалент.
+    \item На \href{https://wiki.haskell.org/Pointfree}{Haskell Wiki} есть инструменты для перевода между стилями.
+    \item Опять же, не перестарайтесь:
+          \begin{haskell}
+            > pl \x y -> compare (f x) (f y)
+            (. f) . compare . f
+          \end{haskell}
+          \pause
+    \item Яснее выразить тот же смысл через \haskinline|on|:
+          \begin{haskell}
+            import Data.Function (on)
+            compare `on` f
+          \end{haskell}
+    \item В языках семейств Forth и APL бесточечный стиль является основным.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Программирование, направляемое типами}
+  \begin{itemize}
+    \item При реализации полиморфных функций очень часто их тип подсказывает реализацию.
+    \item Пример:
+          \begin{haskell}
+            foo :: (a -> b, b -> c) -> (a -> c)
+          \end{haskell}
+          Какую часть реализации можно написать сразу?
+          \begin{haskell}
+            foo !\pause!(f, g) = !\pause!\x ->!\pause! ?
+          \end{haskell}
+          Типы переменных:\pause
+          \begin{haskell}
+            f :: a -> b, g :: b -> c, !\pause!x :: a, ? :: c
+          \end{haskell}
+          Можно увидеть, что \haskinline|?| может быть \haskinline|g ??|, где \haskinline|?? :: |\pause\haskinline|b = |\pause\haskinline|f x|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Типизированные дыры в коде}
+  \begin{itemize}
+    \item Эти рассуждения не обязательно делать вручную.
+    \item Если в выражении (а не в образце) использовать дыру \haskinline|_| (или \haskinline|_название|; дыр может быть несколько), то увидим ожидаемый в этом месте тип.
+    \item
+          \begin{haskell}
+            foo :: (a -> b, b -> c) -> (a -> c)
+            foo (f, g) = \x -> g _
+          \end{haskell}
+          выдаст сообщение
+          \begin{ghcismall}
+            • Found hole: _ :: b
+              Where: ‘b’ is a rigid type variable bound by
+                     the type signature for foo
+            • Relevant bindings include
+                x :: a, g :: b -> c, f :: a -> b, ...
+          \end{ghcismall}
+    \item \emph{Rigid} (жёсткая) переменная типа "--- из сигнатуры: тип выбирает вызывающий, и внутри определения её нельзя заменить конкретным. Та же фраза будет в ошибке, если вернуть \haskinline|Int| вместо \haskinline|a|.
+  \end{itemize}
+\end{frame}
+
+\end{document}

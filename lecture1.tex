@@ -1,0 +1,397 @@
+\documentclass[10pt]{beamer}
+\input{lecture_preamble.tex}
+\usepackage{tikz}
+
+\title{Лекция 1: введение и основы синтаксиса}
+
+\begin{document}
+\begin{frame}[plain]
+  \maketitle
+\end{frame}
+
+\begin{frame}
+  \frametitle{Организация курса}
+  \begin{itemize}
+    \item 17 лекций
+    \item 3 лабораторных
+    \item Итоговый проект
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Парадигмы программирования}
+  \begin{itemize}
+    \item Что такое парадигма?
+          \pause
+          \begin{quote}
+            \enquote{Совокупность идей и понятий, определяющих стиль написания компьютерных программ.} (Wikipedia)
+          \end{quote}
+          \pause
+    \item Основные парадигмы:
+          \pause
+          \begin{itemize}
+            \item Структурное программирование
+            \item Процедурное программирование
+            \item \textbf{Функциональное программирование}
+            \item Логическое программирование
+            \item Объектно-ориентированное программирование
+          \end{itemize}
+          \pause
+    \item В парадигме важно не только то, что используется, но то, использование чего не допускается или минимизируется.
+          \pause
+    \item Например, \haskinline!goto! в структурном программировании, глобальные переменные в ООП.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \includegraphics[trim={0 0 144mm -2mm},clip,width=\textwidth,height=\textheight,keepaspectratio]{paradigmsDIAGRAMeng108.pdf}
+  \footnotesize  \href{https://www.info.ucl.ac.be/~pvr/paradigms.html}{Peter Van Roy, "Programming Paradigms for Dummies: What Every Programmer Should Know", 2009}
+\end{frame}
+
+\begin{frame}
+  \frametitle{От C к Haskell: что добавляется}
+  \centering
+  \begin{tikzpicture}[
+      x=1cm, y=1cm,
+      lang/.style={draw=mDarkTeal, thick, rounded corners=2pt, fill=mDarkTeal!8,
+          minimum width=17mm, minimum height=6.5mm, font=\small\bfseries},
+      feat/.style={draw=mLightBrown!60, fill=mLightBrown!10, rounded corners=2pt,
+          font=\scriptsize, align=center, inner sep=3pt},
+      arr/.style={-stealth, thick, black!55}]
+    \node[lang] (c)     at (0, 5.0)     {C};
+    \node[feat] (f1)    at (0, 4.1)     {+ функции первого класса (замыкания)};
+    \node[lang] (py)    at (-2.6, 3.2)  {Python};
+    \node[lang] (java)  at (2.6, 3.2)   {Java};
+    \node[feat] (f2)    at (0, 2.1)     {+ выражения вместо инструкций\\ + неизменяемость по умолчанию\\ + вывод типов};
+    \node[lang] (ocaml) at (-2.6, 1.0)  {OCaml};
+    \node[lang] (scala) at (2.6, 1.0)   {Scala};
+    \node[feat] (f3)    at (0, 0.0)     {+ ленивость\\ + чистота: эффекты видны в типах};
+    \node[lang, draw=mLightBrown, fill=mLightBrown!20] (hs) at (0, -1.0) {Haskell};
+    \draw[arr] (c) -- (f1);
+    \draw[arr] (f1) -- (py);
+    \draw[arr] (f1) -- (java);
+    \draw[arr] (py) -- (f2.north);
+    \draw[arr] (java) -- (f2.north);
+    \draw[arr] (f2.south) -- (ocaml);
+    \draw[arr] (f2.south) -- (scala);
+    \draw[arr] (ocaml) -- (f3.north);
+    \draw[arr] (scala) -- (f3.north);
+    \draw[arr] (f3) -- (hs);
+  \end{tikzpicture}
+
+  \footnotesize Упрощённо: у каждой стрелки есть оговорки (Java~8+, Scala~3, аннотации типов в Python).
+\end{frame}
+
+\begin{frame}
+  \frametitle{Функциональное программирование}
+  \begin{itemize}
+    \item Значения лучше переменных.
+          \begin{itemize}
+            \item Переменная даёт имя значению или функции, а не адресу в памяти.
+            \item Переменные неизменяемы.
+            \item Значения не изменяются после создания.
+          \end{itemize}
+    \item Выражения лучше инструкций.
+          \begin{itemize}
+            \item Аналоги \haskinline|if|, \haskinline|try-catch| и т.д. "--- выражения.
+          \end{itemize}
+    \item Функции как в математике (следующий слайд)
+  \end{itemize}
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{Функциональное программирование}
+  \begin{itemize}
+    \item Функции как в математике\pause
+          \begin{itemize}
+            \item Чистые функции: аргументу соответствует результат, а всё прочее от лукавого.
+                  \begin{itemize}
+                    \item Нет побочных эффектов (ввода-вывода, обращения к внешней памяти, не связанной с аргументом, и т.д.)
+                    \item При одинаковых аргументах результаты такой функции одинаковы
+                  \end{itemize}
+            \item Функции являются значениями (функции первого класса)
+            \item Функции часто принимают и возвращают функции (функции высших порядков)
+          \end{itemize}
+          \pause
+    \item Опора на математические теории: лямбда-исчисление, теория типов, теория категорий
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Языки ФП}
+  \begin{itemize}
+    \item семейство Lisp: первый ФП-язык и один из первых языков высокого уровня вообще
+    \item Erlang и Elixir: упор на многозадачность (модель акторов), надёжность
+    \item Scala, Kotlin, F\#: гибриды с ООП для JVM и для CLR
+    \item Purescript, Elm: для веба
+    \item Семейство ML: OCaml, SML, F\#
+          \pause
+    \item \textbf{Haskell} (нижний узел схемы \enquote{От C к Haskell}):
+          \begin{itemize}
+            \item Чисто функциональный
+                  \pause
+            \item Строго статически типизированный (с очень мощной и выразительной системой типов)
+                  \pause
+            \item Ленивый
+          \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Язык Haskell: начало}
+  \begin{itemize}
+    \item Установите ghcup (\url{https://www.haskell.org/ghcup/})
+    \item Запустите GHCi
+    \item Это оболочка или REPL (Read-Eval-Print loop)
+          \begin{itemize}
+            \item Read: Вы вводите выражения Haskell (и команды GHCi)
+            \item Eval: GHCi вычисляет результат
+            \item Print: и выводит его на экран
+          \end{itemize}
+    \item Пример:
+          \begin{ghcismall}
+            GHCi, version 9.10.3: https://www.haskell.org/ghc/  :? for help
+          \end{ghcismall}
+          \begin{haskell}
+            ghci> 2 + 2
+            4
+            ghci> :t True -- команда GHCi
+            True :: Bool
+          \end{haskell}
+    \item Попробовать онлайн: \url{https://play.haskell.org/}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Язык Haskell: начало}
+  \begin{itemize}
+    \item \haskinline|2 + 2|, \haskinline|True| "--- выражения
+    \item \haskinline|4|, \haskinline|True| "--- значения
+    \item \haskinline|Bool| "--- тип
+          \pause
+    \item Значение "--- \enquote{вычисленное до конца} выражение.
+    \item Тип (статический) "--- множество значений и выражений, построенное по таким правилам, что компилятор может определить типы и проверить отсутствие ошибок в них без запуска программы.
+    \item От типа зависит то, какие операции допустимы:
+          \begin{haskell}
+            ghci> True + False
+          \end{haskell}
+          \begin{ghcismall}
+            <interactive>:1:6: error: [GHC-39999]
+                • No instance for ‘Num Bool’ arising from a use of ‘+’
+                • In the expression: True + False
+                  In an equation for ‘it’: it = True + False
+          \end{ghcismall}
+    \item Это ошибка компиляции, а не выполнения.
+    \item По коду \ghcinline|[GHC-39999]| на \url{https://errors.haskell.org} есть объяснение ошибки и примеры.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Применение функций}
+  \begin{itemize}
+    \item Вызов (применение) функции пишется без скобок: \haskinline|f x|, \haskinline|foo x y|.
+    \item Скобки используются, когда аргументы "--- сложные выражения: \haskinline|f (g x)|
+    \item И внутри сложных выражений вообще.
+    \item Бинарные операторы (как \haskinline|+|) это просто функции с именем из символов вместо букв и цифр.
+          \begin{itemize}
+            \item Можно писать их префиксно, заключив в скобки: \haskinline[breaklines=false]|(+) 2 2|.
+            \item А любую функцию двух аргументов с алфавитным именем можно писать инфиксно между обратными апострофами:
+                  \haskinline|4 `div` 2|.
+            \item Единственный небинарный оператор "--- унарный \haskinline|-|.
+          \end{itemize}
+    \item Названия переменных и функций начинаются со строчной буквы (кроме операторов).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Приоритет применения функций}
+  \begin{itemize}
+    \item Применение функции связывает сильнее любого инфиксного оператора:
+          \begin{haskell}
+            ghci> abs (-2) + 3 !\pause!
+            5
+            ghci> abs (-2 + 3) !\pause!
+            1
+            ghci> max 2 3 + 4 !\pause!
+            7
+          \end{haskell}
+    \item \haskinline|abs| возвращает модуль числа; \haskinline|abs (-2) + 3| читается как \haskinline|(abs (-2)) + 3|.
+    \pause
+    \item Без скобок \haskinline|abs -2 + 3| читается как \haskinline|(abs - 2) + 3|: минус означает вычитание.
+    \item Получится ошибка типов: мы пытаемся вычесть число из функции \haskinline|abs|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Определение функций и переменных}
+  \begin{itemize}
+    \item Определение переменной выглядит как в математике, даже без ключевых слов:
+          \begin{haskell}
+            название = значение
+          \end{haskell}
+    \item Определение функции почти такое же:
+          \begin{haskell}
+            название параметр1 параметр2 = значение
+          \end{haskell}
+    \item \haskinline|=| используется в определениях, \haskinline|==| "--- для проверки равенства.
+    \item Тело функции это не блок, а одно выражение (но сколь угодно сложное).
+          \begin{haskell}
+            ghci> x = 2 + 3
+            ghci> x
+            5
+            !\pause!
+            ghci> square x = x * x
+            ghci> square 2
+            4
+          \end{haskell}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Базовые типы}
+  \begin{itemize}
+    \item Названия типов всегда с заглавной буквы.
+    \item \haskinline|Bool|: логические значения \haskinline|True| и \haskinline|False|.
+    \item Целые числа:
+          \begin{itemize}
+            \item \haskinline|Integer|: неограниченные (кроме размера памяти);
+            \item \haskinline|Int|: машинные\footnote{по стандарту минимум 30 бит, но в GHC именно 32 или 64 бита}, \haskinline|Word|: машинные без знака;
+            \item \haskinline|Int8|\ldots\haskinline|Int64| (модуль \haskinline|Data.Int|) и \haskinline|Word8|\ldots\haskinline|Word64| (\haskinline|Data.Word|): фиксированного размера, со знаком и без.
+          \end{itemize}
+    \item \haskinline|Float| и \haskinline|Double|: 32- и 64-битные числа с плавающей точкой, по стандарту IEEE-754.
+    \item \haskinline|Char|: символы Unicode.
+    \item \haskinline|()|: \enquote{Единичный тип} (unit) с единственным значением \haskinline|()|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Тип функций и сигнатуры}
+  \begin{itemize}
+    \item Типы функций записываются через \haskinline|->|. Например, \haskinline|Int -> Char| это тип функции из \haskinline|Int| в \haskinline|Char|.
+
+    \item Для нескольких аргументов это выглядит как \pause\haskinline|Bool -> Bool -> Bool|.
+
+    \item \haskinline|::| читается как \enquote{имеет тип}.
+
+    \item Запись \haskinline|выражение :: тип| "--- \enquote{сигнатура типа}.
+
+    \item При объявлении экспортируемой функции или переменной  сигнатура обычно указывается явно:
+          \begin{haskell}
+            foo :: Int -> Char
+            foo x = ...
+          \end{haskell}
+    \item Компилятор обычно может вывести типы сам, но это защищает от \emph{непреднамеренного} изменения.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Арифметика}
+  \begin{itemize}
+    \item Это упрощённая версия.
+    \item Полное объяснение требует понятия, которое будет введено позже.
+    \item Например, команды \haskinline|:type 1| или \haskinline|:type (+)| дадут тип, который понимать пока не требуется.
+    \item То же относится к ошибкам вроде \ghcinline[breaklines=false]|No instance for ‘Num Bool’...|\\ на более раннем слайде.
+    \item Пока достаточно понимать, что есть несколько числовых типов.
+    \item Они делятся на целочисленные (\haskinline|Int|, \haskinline|Integer|) и дробные (\haskinline|Float|, \haskinline|Double|).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Числовые литералы}
+  \begin{itemize}
+    \item Числовые литералы выглядят, как в других языках: \haskinline|0|, \haskinline|1.5|, \haskinline|1.2E-1|, \haskinline|0xDEADBEEF|.
+    \item Целочисленные литералы могут иметь любой числовой тип, а дробные любой дробный.
+    \item Но это относится \emph{только} к литералам.
+    \item Неявного приведения (например, \haskinline|Int| в \haskinline|Double|) в Haskell \emph{нет}.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Приведение числовых типов}
+  \begin{itemize}
+    \item Используйте \haskinline|fromIntegral| для приведения из любого целочисленного типа в любой числовой. Тип-цель можно указать явно:
+          \begin{haskell}
+            ghci> x = 2 :: Integer
+            ghci> x :: Double
+          \end{haskell}
+          \begin{ghcismall}
+            <interactive>:2:1: error: [GHC-83865]
+                • Couldn't match expected type ‘Double’
+                  with actual type ‘Integer’ ...
+          \end{ghcismall}
+          \begin{haskell}
+            ghci> fromIntegral x :: Double
+            2.0
+          \end{haskell}
+    \item А может выводиться из контекста:
+          \begin{haskell}
+            ghci> :t fromIntegral x / (4 :: Double)
+            fromIntegral x / (4 :: Double) :: Double
+          \end{haskell}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Приведение числовых типов (справочно)}
+  \begin{itemize}
+    \item \haskinline|toInteger| переводит любой целочисленный тип \\в \haskinline|Integer|.
+    \item \haskinline|fromInteger| переводит \haskinline|Integer| в любой числовой тип, в том числе \haskinline|Double|.
+    \item При переводе в целые фиксированной разрядности значение может переполниться. Например, в GHC:
+          \begin{haskell}
+            ghci> fromInteger (2^64) :: Int
+            0
+          \end{haskell}
+    \item \haskinline|toRational| и \haskinline|fromRational| "--- аналогично для \haskinline|Rational| и дробных типов.
+    \item \haskinline|ceiling|, \haskinline|floor|, \haskinline|truncate| и \haskinline|round| "--- из дробных типов в целочисленные.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Арифметические операции}
+  \begin{itemize}
+    \item Операции \haskinline|+|, \haskinline|-|, \haskinline|*| "--- как обычно (унарного \haskinline|+| нет).
+    \item \haskinline|/| "--- деление \emph{дробных} чисел.
+          \begin{itemize}
+            \item Использование \haskinline|/| для значений целочисленных типов (\haskinline|Int|, \haskinline|Integer|) даст ошибку \ghcinline|No instance... arising from a use of ‘/’|. Нужно сначала использовать \haskinline|fromIntegral|.
+            \item \haskinline|2 / 4| работает, но \haskinline|(2 :: Integer) / 4| даёт ошибку типов.
+          \end{itemize}
+    \item \haskinline|div| "--- деление нацело
+    \item \haskinline|mod| "--- остаток
+    \item
+          \haskinline|quot| и \haskinline|rem| тоже, но отличаются от них поведением на отрицательных числах.
+    \item \haskinline|^| "--- возведение любого числа в неотрицательную  целую степень.
+    \item \haskinline|^^| "--- дробного в любую целую.
+    \item \haskinline|**| "--- дробного в степень того же типа.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Операции сравнения и\\логические операции}
+  \begin{itemize}
+    \item Большинство операций сравнения выглядят как обычно: \haskinline|==|, \haskinline|>|, \haskinline|<|, \haskinline|>=|, \haskinline|<=|.
+    \item Но $\neq$ обозначается как \haskinline|/=|.
+    \item Функция \haskinline|compare| возвращает \haskinline|Ordering|: тип с тремя значениями \haskinline|LT|, \haskinline|EQ| и \haskinline|GT|.
+    \item Есть функции \haskinline|min| и \haskinline|max|.
+    \item[]
+    \item \enquote{и} это \haskinline|&&|, а \enquote{или} "--- \haskinline!||!, как обычно.
+    \item \enquote{не} "--- \haskinline|not|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Проверьте себя}
+  \begin{enumerate}
+    \item Предскажите результаты, затем проверьте их в GHCi:
+          \begin{haskell}
+            square 3 + 2
+            square (3 + 2)
+          \end{haskell}
+    \item Определите функцию \haskinline|root4|, которая вычисляет корень 4-й степени из числа (используйте \haskinline|sqrt|). Проверьте \haskinline|root4 16|.
+    \item Пусть \haskinline|x = 3 :: Integer|. Вычислите половину \haskinline|x| как \haskinline|Double| с помощью \haskinline|fromIntegral|.
+  \end{enumerate}
+\end{frame}
+%\begin{frame}
+%    \href{run:./lecture2.pdf}{\beamergotobutton{Следующая лекция}}
+%\end{frame}
+\end{document}

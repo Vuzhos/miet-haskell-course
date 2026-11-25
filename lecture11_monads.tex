@@ -1,0 +1,547 @@
+% !TeX document-id = {0c096819-60cf-4d9a-a18e-64c3d748af84}
+% !TeX TXS-program:compile = txs:///pdflatex/[-shell-escape]
+
+\documentclass[11pt]{beamer}
+\input{lecture_preamble.tex}
+
+\title{Лекция 11: монады}
+
+\begin{document}
+\begin{frame}[plain]
+  \maketitle
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Монады}
+  \begin{itemize}
+    \item Монады расширяют возможности аппликативных функторов так же, как те расширяют возможности функторов.
+    \item А именно, там добавляется
+          \begin{haskell}
+            class Applicative m => Monad m where
+              (>>=) :: m a -> (a -> m b) -> m b
+              (>>) :: m a -> m b -> m b
+              mx >> my =!\pause! mx >>=!\pause! \_ -> my
+          \end{haskell}
+          \pause
+    \item Для законных экземпляров \haskinline|mx >> my| $=$ \haskinline|mx *> my|.
+    \item Историческое имя \haskinline|pure| "--- \haskinline|return|.
+          \haskinline|return| не завершает функцию или \haskinline|do|-блок.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{От функторов к монадам}
+  \begin{itemize}
+    \item Больше похоже на знакомые типы, если поменять аргументы \haskinline|(>>=)| местами:
+          \begin{haskellsmall}
+            fmap  ::   (a -> b) -> f a -> f b
+            (<*>) :: f (a -> b) -> f a -> f b
+            (=<<) :: (a -> m b) -> m a -> m b
+          \end{haskellsmall}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Что можно сделать с монадами}
+  \begin{itemize}
+    \item В прошлой лекции:
+          \emph{\enquote{Структура результата аппликативного вычисления зависит только от структуры аргументов, а не от значений внутри них.}}
+    \item Монады снимают это ограничение. Теперь можно написать
+          \begin{haskellsmall}
+            ifM :: Monad m => m Bool -> m a -> m a -> m a
+            ifM mCond mThen mElse =
+              mCond >>=!\pause! \cond ->!\pause!
+                if cond then mThen else mElse
+          \end{haskellsmall}
+          \begin{haskellsmall}
+            ghci> ifM [True] [1] [2,3] !\pause!
+            [1]
+            ghci> ifM [False] [1] [2,3] !\pause!
+            [2,3]
+            ghci> ifM [True, False] [1] [2,3] !\pause!
+            [1,2,3]
+          \end{haskellsmall}
+  \end{itemize}
+\end{frame}
+
+
+\begin{frame}[fragile]
+  \frametitle{Стрелки Клейсли}
+  \begin{itemize}
+    \item Тип второго аргумента \haskinline|(>>=)|, \haskinline|a -> m b|, где \haskinline|m| "--- монада, называется \emph{стрелкой Клейсли}.
+    \item \haskinline|a| и \haskinline|b| могут быть как переменными типа, так и конкретными типами.
+    \item Стрелки Клейсли можно композировать (импорт \href{https://hackage.haskell.org/package/base/docs/Control-Monad.html}{\haskinline{Control.Monad}}):
+          \begin{haskellsmall}
+            (>=>) :: Monad m => (a -> m b) -> (b -> m c) ->
+                                (a -> m c)
+            f >=> g = \x ->!\pause! f x >>=!\pause! g
+          \end{haskellsmall}
+    \item Есть и аналоги \haskinline|filter|, \haskinline|map| и т.д., работающие со стрелками Клейсли. Их можно найти в \href{https://hackage.haskell.org/package/base/docs/Control-Monad.html}{документации \haskinline{Control.Monad}}.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Законы монад}
+  \begin{itemize}
+    \item Левая единица:
+          \begin{haskell}
+            pure x >>= f !$=$! f x
+          \end{haskell}
+    \item Правая единица:
+          \begin{haskell}
+            mx >>= pure !$=$! mx
+          \end{haskell}
+    \item Ассоциативность:
+          \begin{haskellsmall}
+            (mx >>= f) >>= g !$=$! mx >>= (\x -> f x >>= g)
+          \end{haskellsmall}
+    \item Кроме этого, должно быть согласование с \haskinline|<*>|:
+          \begin{haskellsmall}
+            mf <*> mx !$=$!
+              mf >>= (\f -> mx >>= (\x -> pure (f x)))
+          \end{haskellsmall}
+          Удобная запись немного позже.
+    \item Может быть, они не совсем интуитивны.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Законы монад: композиция}
+  \begin{itemize}
+    \item С помощью монадической композиции они записываются естественнее:
+    \item Левая единица: \pause \haskinline|pure >=> f| $=$ \haskinline|f|
+    \item Правая единица: \pause \haskinline|f >=> pure| $=$ \haskinline|f|
+    \item Ассоциативность: \pause \\
+          \haskinline|(f >=> g) >=> h| $=$ \haskinline|f >=> (g >=> h)|
+  \end{itemize}
+  \pause
+  \vfill
+  \begin{center}
+    \small\itshape
+    «Монада "--- это моноид в \href{https://en.wikipedia.org/wiki/Category_(mathematics)}{категории} \href{https://en.wikipedia.org/wiki/Endofunctor}{эндофункторов}».
+    \\
+    \normalfont\footnotesize
+    \href{https://medium.com/@felix.kuehl/a-monad-is-just-a-monoid-in-the-category-of-endofunctors-lets-actually-unravel-this-f5d4b7dbe5d6}{Подробный разбор: Felix Kühl (примеры на Scala)}
+  \end{center}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Примеры монад}
+  \begin{itemize}
+    \item \haskinline|Maybe| "--- монада. Определим:
+          \begin{haskell*}{texcomments=false}
+            instance Monad Maybe where
+              -- (>>=) :: Maybe a -> (a -> Maybe b) ->
+              --          Maybe b
+              Nothing >>= _ =!\pause! Nothing
+              Just x  >>= f =!\pause! f x
+          \end{haskell*}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Монада списков}
+  \begin{itemize}
+    \item Списки тоже монада:
+          \begin{haskell}
+            -- (>{}>=) ::\pause{} [a] -> (a -> [b]) -> [b]
+            []     >>= _ =!\pause! []
+            (x:xs) >>= f =!\pause! f x ++ (xs >>= f)
+          \end{haskell}
+          Или проще:
+          \begin{haskell}
+            xs >>= f = [y |!\pause! x <- xs, y <- f x]
+          \end{haskell}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Ещё примеры монад}
+  \begin{itemize}
+    \item \haskinline|instance Monad Identity|, где \haskinline|newtype Identity a = Identity a|.
+    \item \haskinline|instance Monad (Either c)|.
+    \item \haskinline|instance Monad ((->) c)|: функции с общим окружением типа \haskinline|c| (модель \haskinline|Reader|).
+    \item \haskinline|instance Monoid c => Monad ((,) c)|: пары \haskinline|(c, a)| с накоплением моноида \haskinline|c| (модель \haskinline|Writer|). У библиотечного \haskinline|Writer c a| порядок компонентов "--- \haskinline|(a, c)|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Монады в C++: \mintinline{cpp}|std::optional|}
+  \begin{itemize}
+    \item В C++23 у \href{https://eel.is/c++draft/optional.monadic}{\mintinline{cpp}{std::optional}} есть \mintinline{cpp}|and_then| "--- аналог \haskinline|>>=|:
+          \begin{minted}[fontsize=\footnotesize,autogobble,breaklines=false]{cpp}
+            std::optional<int> parseInt(std::string_view);
+            std::optional<double> reciprocal(int);
+
+            auto result = parseInt("4").and_then(reciprocal);
+          \end{minted}
+          \pause
+    \item Соответствующее выражение на Haskell:
+          \begin{haskellsmall}
+            result = parseInt "4" >>= reciprocal
+          \end{haskellsmall}
+    \item Если \mintinline{cpp}|parseInt| вернул \mintinline{cpp}|std::nullopt|, \mintinline{cpp}|reciprocal| не вызывается.
+    \item У \href{https://eel.is/c++draft/expected.object.monadic}{\mintinline{cpp}{std::expected<T, E>}} в C++23 тоже есть \mintinline{cpp}|and_then|: аналог связывания для \haskinline|Either e|, сохраняющий ошибку.
+    \item В других языках эта операция часто называется \texttt{flatMap}.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\ldots и не монад}
+  \begin{itemize}
+    \item Есть и примеры аппликативных функторов, для которых нельзя определить экземпляр монады, удовлетворяющий законам:
+    \item
+          \begin{haskell}
+            newtype ConstInt a = ConstInt Int
+            fmap f (ConstInt x) = ConstInt x
+            pure _ = ConstInt 0
+            ConstInt x <*> ConstInt y = ConstInt (x + y)
+          \end{haskell}
+    \item Легко увидеть, что \haskinline|pure x >>= f| $=$ \haskinline|f x| не может выполняться ни для какого определения \haskinline|>>=|: \pause правая часть зависит от \haskinline|x|, а левая нет.
+          \pause
+    \item Ещё пример "--- \haskinline|ZipList| (если не допускать \emph{только} бесконечные списки, как в домашнем задании, или активное использование $\bot$).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\haskinline|do|-нотация}
+  \begin{itemize}
+    \item Для монад есть специальный синтаксис, которым часто удобнее пользоваться.
+    \item Скажем, у нас есть цепочка операций
+          \begin{haskellsmall}
+            action1 >>= (\x1 -> action2 x1 >>=
+              (\x2 -> action3 x1 x2 >> action4 x1))
+          \end{haskellsmall}
+    \item
+          Сначала перепишем так:
+          \begin{haskellsmall}
+            action1 >>= \x1 ->
+              action2 x1 >>= \x2 ->
+              action3 x1 x2 >>
+              action4 x1
+          \end{haskellsmall}
+    \item
+          В \haskinline|do|-блоке строки вида \haskinline|action1 >>= \x1 ->| превращаются в \haskinline|x1 <- action1|, а \haskinline|>>| пропадает:
+          \begin{haskellsmall}
+            do x1 <- action1
+               x2 <- action2 x1
+               action3 x1 x2
+               action4 x1
+          \end{haskellsmall}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Законы монад в \haskinline|do|-нотации}
+  \begin{itemize}
+    \item Законы монад также можно записать через \haskinline|do|:
+    \item
+          {\small
+          \begin{tabular}[t]{@{}p{0.43\linewidth}@{\quad}c@{\quad}l@{}}
+            \haskinline{do y <- pure x} & $\mathtt{=}$ & \uncover<2->{\haskinline{f x}} \\
+            \haskinline{   f y} & &
+          \end{tabular}}
+          \pause
+    \item
+          {\small
+          \begin{tabular}[t]{@{}p{0.43\linewidth}@{\quad}c@{\quad}l@{}}
+            \haskinline{do x <- mx} & $\mathtt{=}$ & \uncover<3->{\haskinline{mx}} \\
+            \haskinline{   pure x} & &
+          \end{tabular}}
+          \pause
+    \item
+          {\small
+          \begin{tabular}[t]{@{}p{0.43\linewidth}@{\quad}c@{\quad}l@{}}
+            \haskinline{do y <- do x <- mx} & $\mathtt{=}$ & \uncover<4->{\haskinline{do x <- mx}} \\
+            \haskinline{           f x} & & \uncover<4->{\hphantom{\texttt{do\ }}\haskinline{y <- f x}} \\
+            \hphantom{\texttt{do\ }}\haskinline{g y} & & \uncover<4->{\hphantom{\texttt{do\ }}\haskinline{g y}}
+          \end{tabular}}
+          \pause
+    \item Согласование с \haskinline|<*>| (не закон монады):
+
+          {\small
+          \begin{tabular}[t]{@{}p{0.43\linewidth}@{\quad}c@{\quad}l@{}}
+            \haskinline{mf <*> mx} & $\mathtt{=}$ & \uncover<5->{\haskinline{do f <- mf}} \\
+            & & \uncover<5->{\hphantom{\texttt{do\ }}\haskinline{x <- mx}} \\
+            & & \uncover<5->{\hphantom{\texttt{do\ }}\haskinline{pure (f x)}}
+          \end{tabular}}
+          \pause
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Общая форма \haskinline|do|-нотации}
+  \begin{itemize}
+    \item Каждая строка \haskinline|do|-блока имеет вид \haskinline|образец <- м_выражение|, \haskinline|let образец = выражение| или просто \haskinline|м_выражение|.
+    \item Первые два вида не могут быть в конце.
+    \item \haskinline|м_выражение| должно иметь тип \haskinline|m a| для какой-то монады \haskinline|m| и типа \haskinline|a|.
+    \item \haskinline|m| одна для всех строк, \haskinline|a| могут различаться.
+    \item \haskinline|образец| в строке с \haskinline|<-| имеет тип \haskinline|a|.
+    \item Если образец после \haskinline|<-| может не совпасть, нужен экземпляр \haskinline|MonadFail|; при несовпадении вызывается \haskinline|fail|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Несовпадение образца в \haskinline|do|-блоке}
+  \begin{itemize}
+    \item Для \haskinline|Maybe| несовпадение образца даёт \haskinline|Nothing|:
+          \begin{haskell}
+            safeHead :: Maybe [Int] -> Maybe Int
+            safeHead mx = do
+              (x : _) <- mx
+              pure x
+          \end{haskell}
+          \pause
+          \begin{haskell}
+            ghci> safeHead (Just [2, 3])
+            !\pause!Just 2
+            ghci> safeHead (Just [])
+            !\pause!Nothing
+          \end{haskell}
+    \item При несовпадении \haskinline|pure x| не выполняется.
+    \item Подробности "--- в \href{https://hackage.haskell.org/package/base/docs/Control-Monad-Fail.html#t:MonadFail}{документации \haskinline{MonadFail}}.
+    \item Дальше нам достаточно образцов, которые всегда совпадают.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Функции из \haskinline|Control.Monad|}
+  \begin{itemize}[<+->]
+    \item Нужен импорт \href{https://hackage.haskell.org/package/base/docs/Control-Monad.html}{\haskinline{Control.Monad}}: здесь определены \haskinline|(>=>)|, \haskinline|join|, \haskinline|zipWithM| и \haskinline|foldM|.
+    \item
+          \begin{haskell}
+            join :: Monad m => m (m a) -> m a
+          \end{haskell}
+    \item
+          \begin{haskell}
+            zipWithM :: Applicative m =>
+              (a -> b -> m c) -> [a] -> [b] -> m [c]
+          \end{haskell}
+    \item
+          \begin{haskellsmall}
+            foldM :: (Foldable t, Monad m) =>
+              (b -> a -> m b) -> b -> t a -> m b
+          \end{haskellsmall}
+          Свёртка слева: шаг возвращает результат в монаде.
+    \item Подумайте, как эти функции работают для \haskinline|m = []| и \haskinline|m = Maybe|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\haskinline|foldM|: пример}
+  \begin{itemize}
+    \item Проводим операции по порядку. Отрицательный промежуточный баланс означает отказ:
+          \begin{haskellsmall}
+            step :: Integer -> Integer -> Maybe Integer
+            step balance delta
+              | balance + delta < 0 = Nothing
+              | otherwise = Just (balance + delta)
+          \end{haskellsmall}
+    \item Начальный баланс "--- \haskinline|10|:
+          \begin{haskellsmall}
+            ghci> foldM step 10 [-3, 5]
+            !\pause!Just 12
+            ghci> foldM step 10 [-12, 5]
+            !\pause!Nothing
+          \end{haskellsmall}
+    \item Во втором случае \haskinline|+5| уже не обрабатывается, хотя итоговая сумма могла бы стать положительной.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\haskinline|join| и \haskinline|>>=|: упражнение}
+  \begin{itemize}
+    \item Выразите \haskinline|join| через \haskinline|>>=|, а затем \haskinline|>>=| через \haskinline|fmap| и \haskinline|join|:
+          \begin{haskell}
+            join :: Monad m => m (m a) -> m a
+            join mm = ???
+
+            mx >>= g = ???
+          \end{haskell}
+    \item Подсказка: подумайте о типе \haskinline|fmap g mx|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Отбор значений: \haskinline|guard|}
+  \begin{itemize}
+    \item \href{https://hackage.haskell.org/package/base/docs/Control-Monad.html#v:guard}{\haskinline{guard}} из \haskinline|Control.Monad| проверяет условие:
+          \begin{haskellsmall}
+            import Control.Monad (guard)
+            guard :: Alternative f => Bool -> f ()
+            -- Для Maybe:
+            guard True  !$=$!!\pause! Just ()
+            guard False !$=$!!\pause! Nothing
+          \end{haskellsmall}
+    \item Можно продолжить вычисление, только если число чётное:
+          \begin{haskellsmall}
+            evenSquare :: Maybe Int -> Maybe Int
+            evenSquare mx = do
+              x <- mx
+              guard (even x)
+              pure (x * x)
+          \end{haskellsmall}
+    \item У \haskinline|Maybe| и списков есть \href{https://hackage.haskell.org/package/base/docs/Control-Applicative.html#t:Alternative}{\haskinline{Alternative}}; для списков \haskinline|guard False| даёт \haskinline|[]|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Монадические включения}
+  \begin{itemize}
+    \item \href{https://downloads.haskell.org/~ghc/latest/docs/users_guide/exts/monad_comprehensions.html}{\haskinline{MonadComprehensions}} обобщает синтаксис списковых включений на монады:
+          \begin{haskellsmall*}{texcomments=false}
+            {-# LANGUAGE MonadComprehensions #-}
+            evenSquare mx = [x * x | x <- mx, even x]
+          \end{haskellsmall*}
+          \pause
+    \item Перевод в \haskinline|do|-нотацию:
+          \begin{haskellsmall}
+            evenSquare mx = do x <- mx
+                               guard (even x)
+                               return (x * x)
+          \end{haskellsmall}
+          \pause
+    \item Например, для \haskinline|Maybe|:
+          \begin{haskellsmall}
+            ghci> :set -XMonadComprehensions
+            ghci> [x * x | x <- Just 2, even x]
+            !\pause!Just 4
+            ghci> [x * x | x <- Just 3, even x]
+            !\pause!Nothing
+          \end{haskellsmall}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Монада \haskinline|State|}
+  \begin{itemize}
+    \item Рассмотрим ещё один, более сложный пример:
+    \item
+          \begin{haskellsmall}
+            newtype State s a = State { runState :: s -> (a, s) }
+          \end{haskellsmall}
+          Это \enquote{вычисления с состоянием}, которые могут выдать результат, зависящий от состояния, и изменить это состояние.
+    \item \haskinline|runState| принимает вычисление и начальное состояние, возвращает результат и конечное состояние.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\haskinline|State|: экземпляры Functor и Applicative}
+  \begin{itemize}
+    \item Как сделать эти вычисления аппликативным функтором?
+          \begin{haskellsmall}
+            instance Functor (State s) where
+              fmap f (State gx) = State (\s1 ->!\pause!
+                let (x, s2) = gx s1
+                in!\pause! (f x, s2))
+
+            instance Applicative (State s) where
+              pure x = State (\s1 ->!\pause! (x, s1))
+              (State gf) <*> (State gx) = State (\s1 ->
+                let (f, s2) = gf s1!\pause!
+                    (x, s3) = gx s2
+                in!\pause! (f x, s3))
+          \end{haskellsmall}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Монада \haskinline|State|}
+  \begin{itemize}
+    \item А теперь монадой:
+          \begin{haskellsmall}
+            instance Monad (State s) where
+              State gx >>= f = State (\s1 ->
+                let (x, s2) = gx s1!\pause!
+                    State gy = f x
+                in!\pause! gy s2)
+          \end{haskellsmall}
+          \pause
+    \item Определим вспомогательные функции:
+          \begin{haskellsmall}
+            get :: State s s
+            get = State!\pause! (\s -> (s, s))
+
+            put :: s -> State s ()
+            put x = State!\pause! (\_ -> ((), x))
+
+            modify :: (s -> s) -> State s ()
+            modify f = do x <- get
+                          put (f x)
+          \end{haskellsmall}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\haskinline|State|: пример вычисления}
+  \begin{itemize}
+    \item Прочитаем состояние, увеличим его и вернём оба значения:
+          \begin{haskell}
+            increment :: State Int (Int, Int)
+            increment = do
+              old <- get
+              modify (+1)
+              new <- get
+              pure (old, new)
+          \end{haskell}
+          \pause
+    \item Запустим вычисление с начальным состоянием \haskinline|10|:
+          \begin{haskell}
+            ghci> runState increment 10
+            ((10,11),11)
+          \end{haskell}
+    \item \haskinline|(10,11)| "--- результат, последнее \haskinline|11| "--- конечное состояние.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\haskinline|State| и \haskinline|traverse|: упражнение}
+  \begin{itemize}
+    \item Дополнительное упражнение: пронумеруйте элементы списка с помощью состояния.
+    \item Каждый элемент получает текущий номер, затем счётчик увеличивается:
+          \begin{haskell}
+            number :: a -> State Int (Int, a)
+            number x = ???
+          \end{haskell}
+    \item Подсказка: используйте \haskinline|get|, \haskinline|modify| и \haskinline|pure|.
+          \pause
+    \item Ожидаемый результат обхода:
+          \begin{haskellsmall}
+            ghci> runState (traverse number ["a", "b"]) 0
+            ([(0,"a"),(1,"b")],2)
+          \end{haskellsmall}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Монада \haskinline|State| в библиотеках}
+  \begin{itemize}
+    \item \hackage{transformers} содержит сами трансформеры монад (\haskinline|StateT|, \haskinline|ReaderT|, \ldots; о них позже в курсе), модуль \href{https://hackage.haskell.org/package/transformers/docs/Control-Monad-Trans-State.html}{\haskinline{Control.Monad.Trans.State}}.
+    \item \hackage{mtl} строится на \hackage{transformers} и добавляет классы вроде \href{https://hackage.haskell.org/package/mtl/docs/Control-Monad-State-Class.html#t:MonadState}{\haskinline{MonadState}}, чтобы \haskinline|get| и \haskinline|put| работали без явного \haskinline|lift|; модуль \href{https://hackage.haskell.org/package/mtl/docs/Control-Monad-State.html}{\haskinline{Control.Monad.State}}.
+    \item В обоих \haskinline|State s| определён как \haskinline|StateT s Identity|.
+    \item Поэтому \emph{конструктора} \haskinline|State| там нет: вместо него функция
+          \begin{haskell}
+            state :: (s -> (a, s)) -> State s a
+          \end{haskell}
+    \item \haskinline|runState|, \haskinline|get|, \haskinline|put|, \haskinline|modify| есть, а также \haskinline|evalState| (только результат) и \haskinline|execState| (только состояние).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Дополнительное чтение}
+  \begin{itemize}
+    \item \href{https://www.snoyman.com/blog/2017/01/functors-applicatives-and-monads}{Functors, Applicatives, and Monads}
+    \item \href{https://wiki.haskell.org/Typeclassopedia}{Typeclassopedia} (ещё раз)
+    \item \href{https://smunix.github.io/dev.stephendiehl.com/hask/index.html#monads}{What I Wish I Knew When Learning Haskell: Monads}
+    \item \href{https://wiki.haskell.org/All_About_Monads}{All About Monads}
+    \item Bartosz Milewski: \href{https://bartoszmilewski.com/2014/10/28/category-theory-for-programmers-the-preface/}{Category Theory for Programmers}, особенно \href{https://bartoszmilewski.com/2016/12/27/monads-categorically/}{глава 22: Monads Categorically}
+    \item И более сложные монады:
+          \begin{itemize}
+            \item \href{http://blog.sigfpe.com/2008/12/mother-of-all-monads.html}{The Mother of all Monads}
+            \item \href{https://lukepalmer.wordpress.com/2008/08/10/mindfuck-the-reverse-state-monad/}{Mindfuck: The Reverse State Monad}
+            \item \href{https://web.archive.org/web/2024/https://tech-blog.capital-match.com/posts/5-the-reverse-state-monad.html}{The Curious Time-Traveling Reverse State Monad}
+          \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\end{document}

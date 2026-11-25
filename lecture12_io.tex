@@ -1,0 +1,437 @@
+% !TeX document-id = {40e7f911-37dd-4856-a048-b5b803f1756a}
+% !TeX TXS-program:compile = txs:///pdflatex/[-shell-escape]
+
+\documentclass[11pt]{beamer}
+\input{lecture_preamble.tex}
+
+\title{Лекция 12: монада IO и взаимодействие с внешним миром}
+
+\begin{document}
+
+\begin{frame}[plain]
+  \maketitle
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Монада IO}
+  \begin{itemize}
+    \item Среди многих монад стандартной библиотеки, \haskinline|IO| играет особую роль.
+    \item Значение типа \haskinline|IO a| описывает вычисление с результатом типа \haskinline|a| и побочными эффектами.
+    \item \haskinline|IO| описывает взаимодействие с внешним миром и работу с изменяемым состоянием.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Программы командной строки}
+  \begin{itemize}
+    \item Исполняемая программа в Haskell задаётся значением
+          \haskinline|main :: IO a| (почти всегда \haskinline|IO ()|).
+    \item Это аналог \mintinline{c}|int main(int argc, char** argv)| в C, \mintinline{java}|public static void main(String[] args)| в Java и т.д.
+    \item \href{https://hackage.haskell.org/package/base/docs/System-Environment.html}{\haskinline{System.Environment.getArgs :: IO [String]}}. Там же есть функции для чтения переменных окружения.
+    \item \hackage{optparse-applicative}: разбор аргументов командной строки. В конце документации есть \href{https://hackage.haskell.org/package/optparse-applicative\#:~:text=Tutorials,-These}{ссылки на учебные материалы}.
+    \item \href{https://hackage.haskell.org/package/base/docs/System-Exit.html}{\haskinline{System.Exit.exitWith :: ExitCode -> IO a}}.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Интерактивные программы}
+  \begin{itemize}
+    \item Из консоли можно читать текст, вводимый пользователем:
+          \begin{haskell}
+            getLine ::!\pause! IO String
+          \end{haskell}
+    \item И писать в неё:
+          \begin{haskell}
+            putStr, putStrLn ::!\pause! String -> IO ()
+            print :: Show a => a -> IO () 
+          \end{haskell}
+          \pause
+    \item Простой пример: читаем любую строку, выводим её длину и повторяем (а на \haskinline|"quit"| выходим):
+          \pause
+          \begin{haskellsmall}
+            main = do
+              line <- getLine
+              if line /= "quit"
+                then do
+                  print (length line)
+                  main
+                else
+                  pure ()  -- или exitSuccess
+          \end{haskellsmall}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Побег из \haskinline|IO|}
+  \begin{itemize}
+    \item Если у нас есть значение типа \haskinline|IO a|, можно ли превратить его просто в \haskinline|a|?
+          \pause
+    \item В обычном коде нет.
+          \pause
+    \item Внутри \haskinline|do| можно использовать результат действия, но само вычисление остаётся в \haskinline|IO|.
+    \item Но есть функция \\
+          \href{https://hackage.haskell.org/package/base/docs/System-IO-Unsafe.html#v:unsafePerformIO}{\haskinline{unsafePerformIO :: IO a -> a}}.
+    \item Само название говорит о её небезопасности.
+    \item Конкретное использование может быть и безопасным, но для этого надо знать довольно много о внутренностях Haskell.
+          \pause
+    \item Поэтому в рамках этого курса мы её использовать не будем, как и \href{https://hackage.haskell.org/package/base/docs/System-IO-Unsafe.html}{другие \haskinline{unsafe*IO}}.
+    \item А есть ещё \href{https://hackage.haskell.org/package/bytestring/docs/Data-ByteString-Internal.html#v:accursedUnutterablePerformIO}{\haskinline{accursedUnutterablePerformIO}}\ldots
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Обход с \haskinline|IO|: \haskinline|for| и \haskinline|for_|}
+  \begin{itemize}
+    \item Как \haskinline|traverse| и \haskinline|traverse_|, но функция передаётся последней:
+          \begin{haskellsmall}
+            import Data.Traversable (for)
+            import Data.Foldable (for_)
+          \end{haskellsmall}
+          \haskinline|for = flip traverse|, \haskinline|for_ = flip traverse_|.
+    \item \haskinline|for| собирает результаты; \haskinline|for_| отбрасывает их, сохраняя эффекты. \haskinline|forM(_)| и \haskinline|mapM(_)| "--- старые имена того же для монад.
+          \pause
+    \item Так удобно записывать действие из нескольких строк:
+          \begin{haskell}
+            for_ [1..3] $ \i -> do
+              print i
+              print (i * i)
+          \end{haskell}
+          Для каждого элемента печатаем число и его квадрат.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Условное выполнение: \haskinline|when|}
+  \begin{itemize}
+    \item Функция из упражнения в лекции 10:
+          \begin{haskellsmall}
+            import Control.Monad (when)
+
+            when :: Applicative f => Bool -> f () -> f ()
+          \end{haskellsmall}
+    \item При \haskinline|True| выполняет действие, при \haskinline|False| возвращает \haskinline|pure ()| без его эффектов.
+          \pause
+    \item Например, условный диагностический вывод:
+          \begin{haskellsmall}
+            report :: Bool -> IO ()
+            report debug = do
+              when debug (putStrLn "Debug mode")
+              putStrLn "Running"
+          \end{haskellsmall}
+          \haskinline|report False| печатает только \haskinline|"Running"|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Ловушки консоли: буферизация}
+  \begin{itemize}
+    \item В скомпилированной программе \haskinline|stdout| буферизуется построчно (а при перенаправлении в файл или канал "--- блоками). Поэтому
+          \begin{haskell}
+            putStr "Введите имя: "
+            name <- getLine
+          \end{haskell}
+          не покажет приглашение, пока пользователь не нажмёт Enter.
+          \pause
+    \item Решения: \haskinline|hFlush stdout| после \haskinline|putStr| или \haskinline|hSetBuffering stdout NoBuffering| в начале \haskinline|main| (модуль \href{https://hackage.haskell.org/package/base/docs/System-IO.html}{\haskinline{System.IO}}).
+    \item В GHCi и \ghcinline|stack repl| этого не видно: там буферизация отключена. Проверяйте \ghcinline|stack run|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Ловушки консоли: кодировки}
+  \begin{itemize}
+    \item Кодировка \haskinline|stdin|/\haskinline|stdout| и \haskinline|readFile|/\haskinline|writeFile| определяется окружением; UTF-8 не гарантирована.
+    \item Под Windows при неподходящей кодировке программа может упасть или вывести крякозябры.
+          \pause
+    \item Решение: \ghcinline|chcp 65001| перед запуском и/или в программе
+          \begin{haskell}
+            hSetEncoding stdout utf8
+            hSetEncoding stdin utf8
+          \end{haskell}
+    \item Для файлов "--- \haskinline|hSetEncoding h utf8| после \haskinline|openFile| (или \haskinline|withFile|).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Изменяемые переменные: \haskinline|IORef|}
+  \begin{itemize}
+    \item Модуль \href{https://hackage.haskell.org/package/base/docs/Data-IORef.html}{\haskinline{Data.IORef}}:
+          \begin{haskell}
+            newIORef :: a -> IO (IORef a)
+            readIORef :: IORef a -> IO a
+            writeIORef :: IORef a -> a -> IO ()
+            modifyIORef' :: IORef a -> (a -> a) -> IO ()
+          \end{haskell}
+    \item Используйте \haskinline|modifyIORef'| (строгий), а не \haskinline|modifyIORef|: последний накапливает отложенные вычисления ровно как \haskinline|foldl| в лекции 9.
+    \item Массивы в \haskinline|IO|: \href{https://hackage.haskell.org/package/array/docs/Data-Array-IO.html#t:IOArray}{\haskinline{IOArray}} и \href{https://hackage.haskell.org/package/vector/docs/Data-Vector-Mutable.html#t:IOVector}{\haskinline{IOVector}}. Например, \haskinline|Data.Vector.Mutable.write v i x| записывает \haskinline|x| по индексу \haskinline|i| на месте.
+    \item Для нескольких потоков нужны \haskinline|atomicModifyIORef'|, \haskinline|MVar| или \haskinline|STM| (лекция 16).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Исключения (кратко)}
+  \begin{itemize}
+    \item Модуль \href{https://hackage.haskell.org/package/base/docs/Control-Exception.html}{\haskinline{Control.Exception}}:
+          \begin{haskellsmall}
+            throwIO :: Exception e => e -> IO a
+            catch   :: Exception e => IO a -> (e -> IO a) -> IO a
+            try     :: Exception e => IO a -> IO (Either e a)
+            evaluate :: a -> IO a
+            bracket :: IO a -> (a -> IO b) -> (a -> IO c) -> IO c
+          \end{haskellsmall}
+    \item Нужно определить, какие исключения ловить:
+          \begin{haskellsmall}
+            import System.IO (readFile')
+
+            try @IOException (readFile' path)
+          \end{haskellsmall}
+          Ловить всё (\haskinline|SomeException|) "--- обычно плохая идея.
+    \item \haskinline|error| и неполные сопоставления тоже исключения (\haskinline|ErrorCall|, \haskinline|PatternMatchFail|), но лучше их не ловить, а не допускать.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Исключения и ленивость}
+  \begin{itemize}
+    \item \haskinline|pure| не вычисляет результат:
+          \begin{haskellsmall}
+            try @ArithException (pure (div (1 :: Int) 0))
+          \end{haskellsmall}
+          Получим \haskinline|Right| с отложенным вычислением; ошибка возникнет уже вне \haskinline|try|.
+          \pause
+    \item Чтобы вычислить результат внутри \haskinline|try|:
+          \begin{haskellsmall}
+            try @ArithException (evaluate (div (1 :: Int) 0))
+          \end{haskellsmall}
+          Здесь получим \haskinline|Left DivideByZero|.
+    \item \haskinline|evaluate| вычисляет только до \emph{WHNF} (лекция 9).
+    \item Ошибки ленивого \haskinline|readFile| тоже могут возникнуть вне \haskinline|try|; \haskinline|readFile'| читает файл сразу.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Работа с файлами}
+  \begin{itemize}
+    \item Модуль \href{https://hackage.haskell.org/package/base/docs/System-IO.html}{\haskinline|System.IO|}.
+    \item Напомню, \haskinline|type FilePath = String|.
+    \item Простейшие операции это чтение и запись в файл:
+          \begin{haskell}
+            readFile :: FilePath -> IO String
+            writeFile, appendFile :: 
+              FilePath -> String -> IO ()
+          \end{haskell}
+    \item
+          Или можно открыть файл один раз, получить \haskinline|Handle| (дескриптор файла) и работать с ним:
+          \begin{haskell}
+            openFile, openBinaryFile :: 
+              FilePath -> IOMode -> IO Handle 
+            hPutStrLn :: Handle -> String -> IO ()
+            hGetLine, hGetContents :: Handle -> IO String
+          \end{haskell}
+          \pause
+    \item
+          Функции работы с консолью сводятся к этим:
+          \begin{haskell}
+            getLine = hGetLine stdin
+          \end{haskell}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Работа с файлами (2)}
+  \begin{itemize}
+    \item В чём проблема с кодом вроде
+          \begin{haskell}
+            do
+              file <- openFile path ReadWriteMode
+              ...
+              hClose file
+          \end{haskell}
+          \pause
+    \item Что, если на каком-то из шагов случится исключение? Мы остаёмся с открытым файлом.
+    \item Если это случится много раз, программа вылетит.
+          \pause
+    \item Чтобы закрыть файл и при исключении:
+          \begin{haskell}
+            withFile path ReadWriteMode $ \file -> do
+              ...
+          \end{haskell}
+    \item Это частный случай функции \haskinline|bracket|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Ленивый ввод-вывод}
+  \begin{itemize}
+    \item \haskinline|hGetContents| возвращает строку: файл читается по мере её вычисления.
+    \item С одной стороны, это хорошо: не нужно явно указывать, сколько читать.
+    \item Но попытка дочитать строку после закрытия файла вызывает ошибку:
+          \begin{haskellsmall}
+            wrong = do
+              fileData <-
+                withFile "test.txt" ReadMode hGetContents
+              putStr fileData
+          \end{haskellsmall}
+    \item Нужно использовать данные внутри \haskinline|withFile|:
+          \begin{haskellsmall}
+            right = withFile "test.txt" ReadMode $ \file -> do
+              fileData <- hGetContents file
+              putStr fileData
+          \end{haskellsmall}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Строгий ввод-вывод}
+  \begin{itemize}
+    \item С GHC 9.0 в \haskinline|System.IO| есть строгие варианты \haskinline|readFile'|, \haskinline|hGetContents'|, \haskinline|getContents'|: они читают всё сразу, и проблем с закрытием файла у них нет.
+    \item Обычно лучше использовать их или строгие варианты \haskinline|Text|/\haskinline|ByteString| со следующего слайда. Ленивые варианты \haskinline|readFile| читают по требованию.
+    \item Ленивый ввод-вывод остаётся полезным для потоковой обработки больших файлов, но для этого есть и более предсказуемые библиотеки (\hackage{conduit}, \hackage{streamly}).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\haskinline|ByteString| и \haskinline|Text|}
+  \begin{itemize}
+    \item Мы знаем, что \haskinline|String| занимает очень много места в памяти, что ухудшает и время работы.
+    \item Вместо него есть \href{https://hackage.haskell.org/package/bytestring/docs/Data-ByteString.html}{\haskinline{Data.ByteString.ByteString}}, по сути представляющий собой массив байтов, и \href{https://hackage.haskell.org/package/bytestring/docs/Data-ByteString-Lazy.html}{\haskinline{Data.ByteString.Lazy.ByteString}} как ленивый список таких массивов.
+    \item Многие функции для работы с ними называются так же, как для \haskinline|String|, но живут в соответствующих модулях (поэтому используется \haskinline|import qualified|).
+    \item Они годятся для бинарных данных (или ASCII, с помощью \href{https://hackage.haskell.org/package/bytestring/docs/Data-ByteString-Char8.html}{\haskinline{Data.ByteString}}\haskinline|[|\href{https://hackage.haskell.org/package/bytestring/docs/Data-ByteString-Lazy-Char8.html}{\haskinline{.Lazy}}\haskinline|].Char8|).
+    \item Для текста аналогичный пакет \haskinline|text| и типы в модулях \href{https://hackage.haskell.org/package/text/docs/Data-Text.html}{\haskinline{Data.Text}}\haskinline|[|\href{https://hackage.haskell.org/package/text/docs/Data-Text-Lazy.html}{\haskinline{.Lazy}}\haskinline|]|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Текст и байты: UTF-8}
+  \begin{itemize}
+    \item \haskinline|ByteString| содержит байты, \haskinline|Text| "--- текст. Для перехода между ними нужно выбрать кодировку.
+    \item \haskinline|Data.ByteString.Char8| \emph{не декодирует UTF-8}: каждый байт интерпретируется как отдельный символ.
+          \pause
+    \item Для UTF-8 есть модуль \href{https://hackage.haskell.org/package/text/docs/Data-Text-Encoding.html}{\haskinline{Data.Text.Encoding}}:
+          \begin{haskellsmall}
+            decodeUtf8' :: ByteString ->
+              Either UnicodeException Text
+            encodeUtf8 :: Text -> ByteString
+          \end{haskellsmall}
+    \item \haskinline|decodeUtf8'| возвращает \haskinline|Left| при некорректной последовательности байтов; \haskinline|Right| содержит декодированный текст.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Случайные значения}
+  \begin{itemize}
+    \item Модуль \href{https://hackage.haskell.org/package/random/docs/System-Random.html}{\haskinline{System.Random}} (пакет \hackage{random}). Класс \haskinline|RandomGen| описывает чистые генераторы псевдослучайных чисел. Например:
+          \begin{haskellsmall}
+            genWord64 :: RandomGen g => g -> (Word64, g)
+          \end{haskellsmall}
+    \item Получаем число и \emph{новое состояние} генератора. \haskinline|Word64| "--- 64-битное беззнаковое целое из \href{https://hackage.haskell.org/package/base/docs/Data-Word.html}{\haskinline{Data.Word}}.
+    \item Стандартный генератор \haskinline|StdGen| имеет экземпляр \haskinline|RandomGen|. Его можно создать из начального значения (\emph{seed}):
+          \begin{haskellsmall}
+            mkStdGen :: Int -> StdGen
+          \end{haskellsmall}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Случайные значения: тип результата}
+  \begin{itemize}
+    \item \haskinline|Uniform a|: равномерное распределение по всем значениям типа \haskinline|a| (например, \haskinline|Bool| или \haskinline|Int|).
+    \item \haskinline|UniformRange a|: равномерное распределение в заданном диапазоне (например, для \haskinline|Int|, \haskinline|Integer| или \haskinline|Double|).
+    \item В \haskinline|System.Random| есть чистые функции:
+          \begin{haskellsmall}
+            uniform :: (Uniform a, RandomGen g) =>
+              g -> (a, g)
+            uniformR :: (UniformRange a, RandomGen g) =>
+              (a, a) -> g -> (a, g)
+          \end{haskellsmall}
+    \item Результат и новое состояние генератора "--- знакомая схема \haskinline|State|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Случайные значения: воспроизводимость}
+  \begin{itemize}
+    \item Передаём новое состояние в следующий вызов:
+          \begin{haskellsmall}
+            g0 = mkStdGen 42
+            (n1 :: Int, g1) = uniformR (1, 100) g0
+            (n2 :: Int, g2) = uniformR (1, 100) g1
+          \end{haskellsmall}
+          \begin{haskellsmall}
+            ghci> (n1, n2)
+            (49,24)
+          \end{haskellsmall}
+    \item Если снова передать \haskinline|g0|, \pause получим \haskinline|(49,49)|.
+    \item При той же версии \haskinline|random| повторный запуск с тем же seed даёт ту же последовательность.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Случайные значения в IO}
+  \begin{itemize}
+    \item В \href{https://hackage.haskell.org/package/random/docs/System-Random-Stateful.html}{\haskinline{System.Random.Stateful}} генераторы сами хранят изменяемое состояние:
+          \begin{haskellsmall}
+            uniformM :: (Uniform a, StatefulGen g m) =>
+              g -> m a
+            uniformRM :: (UniformRange a, StatefulGen g m) =>
+              (a, a) -> g -> m a
+          \end{haskellsmall}
+          \haskinline|StatefulGen g m| связывает генератор \haskinline|g| с монадой \haskinline|m|.
+    \item Глобальный генератор обновляется атомарно:
+          \begin{haskellsmall}
+            globalStdGen :: AtomicGenM StdGen
+          \end{haskellsmall}
+    \item Например, бросок кубика:
+          \begin{haskellsmall}
+            rollDie :: IO Int
+            rollDie = uniformRM (1, 6) globalStdGen
+          \end{haskellsmall}
+          Каждый вызов обновляет состояние генератора.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Из чистого генератора в IO}
+  \begin{itemize}
+    \item \haskinline|AtomicGenM| "--- обёртка над \haskinline|IORef|:
+          \begin{haskellsmall}
+            newtype AtomicGenM g = AtomicGenM (IORef g)
+            atomicModifyIORef' :: IORef g -> (g -> (g, a)) -> IO a
+          \end{haskellsmall}
+    \item Реализуем библиотечную функцию (тип для \haskinline|IO|):
+          \begin{overprint}[\linewidth]
+            \onslide<1>
+              \begin{haskellsmall}
+                applyAtomicGen :: (g -> (a, g)) -> AtomicGenM g -> IO a
+                applyAtomicGen step (AtomicGenM ref) = ???
+              \end{haskellsmall}
+            \onslide<2->
+              \begin{haskellsmall}
+                applyAtomicGen :: (g -> (a, g)) -> AtomicGenM g -> IO a
+                applyAtomicGen step (AtomicGenM ref) =
+                  atomicModifyIORef' ref $ \g ->
+                    let (x, g') = step g
+                    in (g', x)
+              \end{haskellsmall}
+          \end{overprint}
+          \pause
+    \item Тот же бросок кубика через \haskinline|applyAtomicGen|:
+          \begin{haskellsmall}
+            rollDie :: IO Int
+            rollDie = applyAtomicGen (uniformR (1, 6)) globalStdGen
+          \end{haskellsmall}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Дополнительное чтение}
+  \begin{itemize}
+    \item \href{https://www.engineering.upenn.edu/~cis1940/spring13/lectures/08-IO.html}{CIS 194: IO}: действия как описания вычислений и связь с чистотой.
+    \item \href{https://wiki.haskell.org/IO_inside}{IO inside} (Haskell Wiki): как устроена монада \haskinline|IO|.
+    \item \href{https://www.snoyman.com/blog/2016/12/beware-of-readfile/}{Beware of readFile}: ловушки ленивого ввода-вывода и кодировок.
+    \item \href{https://academy.fpblock.com/haskell/tutorial/exceptions/}{Safe exception handling}: исключения и освобождение ресурсов; примеры с \haskinline|UnliftIO.Exception|/\haskinline|RIO|.
+    \item Simon Peyton Jones: \href{https://www.microsoft.com/en-us/research/publication/tackling-awkward-squad-monadic-inputoutput-concurrency-exceptions-foreign-language-calls-haskell/}{Tackling the Awkward Squad} (\emph{углублённо}): \haskinline|IO|, исключения, потоки и FFI; часть API устарела (2001).
+  \end{itemize}
+\end{frame}
+
+\end{document}

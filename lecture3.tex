@@ -1,0 +1,407 @@
+\documentclass[10pt]{beamer}
+\input{lecture_preamble.tex}
+\usepackage{booktabs}
+
+\title{Лекция 3: типы данных}
+
+\begin{document}
+\begin{frame}[plain]
+  \maketitle
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Типы-\enquote{перечисления}}
+  \begin{itemize}
+    \item Тип \haskinline|Bool| не встроен в язык, а определён в стандартной библиотеке:
+          \begin{haskell}
+            data Bool = False | True deriving (...)
+          \end{haskell}
+    \item Ключевое слово \haskinline|data| начинает определение.
+    \item \haskinline|Bool| "--- название типа.
+    \item \haskinline|False| и \haskinline|True| называются конструкторами данных.
+    \item Читаем как \enquote{У типа \haskinline|Bool| есть ровно два значения: \haskinline|False| и \haskinline|True|.}
+          \only<1> { \item О \haskinline|deriving| позже. }
+          \pause
+    \item Так определяется любой тип с фиксированным перечнем значений (как \haskinline|enum| в других языках):
+          \begin{haskell}
+            data Weekday = Monday | Tuesday | ...
+            data FileMode = Read | Write | Append | ...
+          \end{haskell}
+    \item Какие образцы у этих типов (кроме переменных и \haskinline|_|)? \pause
+    \item Каждое значение (конструктор) "--- образец.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Типы-\enquote{структуры}}
+  \begin{itemize}
+    \item \haskinline|data| также используется для аналогов структур: типов с несколькими полями. Например,
+          \begin{haskell}
+data Point = Point Double Double
+\end{haskell}
+    \item Первое \haskinline|Point| "--- название типа.
+    \item Второе "--- конструктора.
+    \item Когда конструктор один, названия обычно совпадают. Всегда по контексту можно определить, что из них имеется в виду.
+    \item Образцы этого типа \pause это\\
+          \begin{haskell}
+            Point образец_Double образец_Double
+          \end{haskell}
+    \item Зададим значение типа \haskinline|Point| и функцию на них:
+          \begin{haskell}
+            ghci> origin = Point 0 0
+
+            ghci> xCoord (Point x _) = x
+            ghci> xCoord origin
+            0.0
+          \end{haskell}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Типы-\enquote{структуры}}
+  \begin{itemize}
+    \item Конструктор является функцией
+          \begin{haskell}
+            ghci> :t Point !\pause!
+            Point :: Double -> Double -> Point
+          \end{haskell}
+    \item Мы можем дать полям конструктора имена. Это:\hypertarget{rec1}{}
+          \begin{itemize}
+            \item Документирует их смысл.
+            \item Определяет функции, возвращающие их значения.
+          \end{itemize}
+          \begin{haskell}
+            ghci> data Point = Point { xCoord :: Double, yCoord :: Double } deriving Show
+            ghci> :t yCoord
+            yCoord :: Point -> Double
+            ghci> yCoord (Point 0 (-1))
+            -1.0
+          \end{haskell}
+    \item Особенно полезно, когда полей много, и только по типу не понять, какое где.
+    \item Если успеем, вернёмся к записям в конце лекции. \hyperlink{rec2}{\beamergotobutton{Синтаксис записей}}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Алгебраические типы: общий случай}
+  \begin{itemize}
+    \item Может быть несколько конструкторов с полями:
+          \begin{haskell}
+            data Shape = Circle Double | Rectangle Double Double
+          \end{haskell}
+    \item Создание значения:
+          \begin{haskell}
+ghci> unitCircle = Circle 1
+\end{haskell}
+    \item Образцы: \haskinline|Circle r| и \haskinline|Rectangle w h| (\haskinline|r|, \haskinline|w|, \haskinline|h| "--- образцы для \haskinline|Double|).
+    \item Функции часто определяются по уравнению на каждый конструктор:
+          \begin{haskell}
+            area (Circle r) = pi * r * r
+            area (Rectangle w h) = w * h
+          \end{haskell}
+          \pause
+    \item Но не обязательно:
+          \begin{haskell}
+            isUnitCircle (Circle 1) = True
+
+            isUnitCircle _ = False
+          \end{haskell}
+          \pause
+    \item Ещё пример: \haskinline!data ImageFormat = JPG | PNG | IF String!
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Типы с параметрами (полиморфные)}
+  \begin{itemize}
+    \item В определении типа могут быть параметры.
+    \item Пример:
+          \begin{haskell}
+            data Maybe a = Nothing | Just a
+          \end{haskell}
+    \item \haskinline|Maybe| "--- конструктор типа.
+    \item Вместо \haskinline|a| можно подставить любой тип, и получить снова тип: \haskinline|Maybe Int|, \haskinline|Maybe Bool|.
+    \item Примеры их значений: \haskinline|Just 1|, \haskinline|Nothing|.
+    \item В Haskell нет отношения \enquote{Надтип "--- подтип}, вместо него \enquote{Более общий "--- частный случай}.
+    \item \haskinline|Maybe a| описывает необязательное значение типа \haskinline|a|.
+          \pause
+    \item Ещё часто встречающийся тип:
+          \begin{haskell}
+            data Either a b = Left a | Right b
+          \end{haskell}
+    \item Могут быть сколь угодно сложные комбинации.
+    \item Например, \haskinline|Either (Either Int Char) (Maybe Bool)| со значением \haskinline|Right Nothing|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\haskinline|Maybe| и \haskinline|null|}
+  \begin{itemize}
+    \item \haskinline|Nothing| похоже на \haskinline|null| в C-подобных языках, но явно прописано в типах.
+    \item Возможность отсутствия значения отражена в типе: \haskinline|Maybe a|.
+    \item Документация объясняет, в каких случаях возвращается \haskinline|Nothing|.
+    \item Нет типов, у которых \haskinline|null| нет и с отсутствием значения приходится что-то придумывать.
+    \item Есть \haskinline|Maybe (Maybe a)| (бывает полезно).
+          \pause
+    \item \enquote{\itshape \haskinline|null| "--- моя ошибка ценой в миллиард долларов... Я планировал сделать любое использование ссылок [в Algol] абсолютно безопасным. Но не удержался от соблазна добавить \haskinline|null| просто потому, что его было так легко реализовать.} (\href{https://ru.wikipedia.org/wiki/Хоар,_Чарльз_Энтони_Ричард}{Тони Хоар}, \href{https://www.infoq.com/presentations/Null-References-The-Billion-Dollar-Mistake-Tony-Hoare}{QCon 2009})
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Кортежи}
+  \begin{itemize}
+    \item Мы могли бы определить типы
+          \begin{haskell}
+            data Pair a b = Pair a b
+            data Triple a b c = Triple a b c
+            ...
+          \end{haskell}
+          Слева \haskinline|Pair| "--- имя типа, справа "--- конструктора данных. Параметры \haskinline|a| и \haskinline|b| слева объявляются, справа используются как типы полей.
+    \item Это универсальные произведения.
+          \pause
+    \item Но определять их не нужно, так как такие типы уже есть, со специальным синтаксисом:\\
+          \haskinline|(a, b)| (или \haskinline|(,) a b|),\\ \haskinline|(a, b, c)| (или \haskinline|(,,) a b c|) и т.д.
+    \item Синтаксис значений и образцов для них аналогичный:
+          \haskinline|(True, Just 'a') :: |\pause\haskinline|(Bool, Maybe Char)|.
+    \item Максимальный размер в GHC "--- 64 (стандарт языка требует поддержки только до 15).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Рекурсивные типы и списки}
+  \begin{itemize}
+    \item Тип может быть рекурсивным, то есть в правой части используется тот тип, который мы определяем.
+    \item Самый важный пример такого типа: списки.
+          Мы могли бы их определить как
+          \begin{haskell}
+            data List a = Nil | Cons a (List a)
+          \end{haskell}
+          Вместо этого они имеют специальный синтаксис, как и кортежи, как будто их определение
+          \begin{haskell}
+            data [a] = [] | a : [a]
+          \end{haskell}
+    \item Любой \haskinline|[a]| или пуст, или имеет \emph{голову} типа \haskinline|a| и \emph{хвост} типа \haskinline|[a]|.
+    \item \haskinline|:| правоассоциативно: \haskinline|1 : 2 : 4 : []| читается \haskinline|1 : (2 : (4 : []))|.
+    \item Сокращение (относится и к значениям и к образцам):\\
+          \haskinline|[x, y, z]| означает \haskinline|x : y : z : []|, а \haskinline|[x]| "--- \haskinline|x : []|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Синонимы типов}
+  \begin{itemize}
+    \item На этом с \haskinline|data| разобрались (пока что).
+          \pause
+    \item Есть ещё два вида определения типов.
+    \item \haskinline|type| объявляет синоним типа "--- другое имя для существующего типа.
+    \item В стандартной библиотеке:
+          \begin{haskell}
+            type String = [Char]
+            type FilePath = String
+          \end{haskell}
+    \item Синоним документирует назначение, но не создаёт отдельный тип. О недостатках представления \haskinline|String| поговорим позже.
+          \pause
+    \item Для \haskinline|FilePath| дело в том, что осмысленные операции над путями не те, что над строками:
+          \begin{haskell}
+            ghci> import Data.List (isPrefixOf)
+            ghci> :{
+            ghci| isPrefixOf ("C:\\Program Files" :: FilePath)
+            ghci|            ("C:\\Program Files (x86)" :: FilePath)
+            ghci| :}
+            True
+          \end{haskell}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\haskinline|newtype|}
+  \begin{itemize}
+    \item \haskinline|newtype| как раз позволяет определить тип с тем же представлением, что существующий, но с другими операциями. Т.е. разумнее было бы
+          \begin{haskell}
+            newtype FilePath = FilePath String
+          \end{haskell}
+    \item Или \haskinline|FilePath [String]| со списком директорий.
+    \item Ещё можно рассмотреть
+          \begin{haskell}
+            newtype EMail = EMail String
+          \end{haskell}
+    \item У \haskinline|type| конструкторов значений нет, у \haskinline|newtype| "--- всегда один с одним полем.
+    \item Между \haskinline|newtype| и \haskinline|data| с одним конструктором с одним полем есть разница из-за ленивости.
+    \item Пока из них предпочитаем первое.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Полиморфные функции и значения}
+  \begin{itemize}
+    \item Какой тип функции
+          \begin{haskell}
+            id x = x -- определение в Prelude
+            ghci> :t id !\pause!
+            id :: a -> a
+          \end{haskell}
+    \item Более явно: \haskinline|id :: forall a. a -> a|.
+    \item Аналогично
+          \begin{haskell}
+            ghci> foo (_, x, y) = (y, x, x)
+            ghci> :t foo !\pause!
+            foo :: (a1, c, a2) -> (a2, c, c) 
+            -- или (a, b, c) -> (c, b, b)
+          \end{haskell}
+    \item \haskinline|Just :: a -> Maybe a|
+    \item И \haskinline|[] :: [a]| "--- полиморфные значения не обязательно функции.
+    \item Параметр типа можно передать явно:
+          \begin{haskell}
+            ghci> :t id @Int
+            id @Int :: Int -> Int
+          \end{haskell}
+  \end{itemize}
+\end{frame}
+
+
+
+\begin{frame}[fragile]
+  \frametitle{Структурно-рекурсивные функции}
+  \begin{itemize}
+    \item Функции над рекурсивными типами часто тоже рекурсивны (или вызывают рекурсивные).
+          \begin{haskell}
+            length :: [a] -> Int
+            length [] = 0
+            length (_ : xs) = length xs + 1
+          \end{haskell}
+    \item Рекурсивный вызов получает более короткий хвост; на пустом списке рекурсия заканчивается:
+          \begin{haskell}
+            length [10, 20]
+              = length [20] + 1
+              = (length [] + 1) + 1
+              = (0 + 1) + 1 = 2
+          \end{haskell}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Рекурсия по числу}
+  \begin{itemize}
+    \item Натуральные числа "--- \enquote{почётный} рекурсивный тип.
+          \pause
+    \item Натуральное число это либо $0$, либо $n + 1$, где $n$ "--- натуральное число.
+    \item Соответственно, функции над ними тоже определяются рекурсивно:
+          \begin{haskell}
+            replicate :: Int -> a -> [a]
+            replicate n _ | n <= 0 = []
+            replicate n x = x : replicate (n - 1) x
+          \end{haskell}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Алгебраические типы}
+  \begin{itemize}
+    \item Несколько полей у конструктора соответствуют декартову произведению множеств, а несколько конструкторов\only<1>{ "--- чему?}\only<2->{ "--- дизъюнктному объединению $A_1 \sqcup A_2 = \{1\} \times A_1 \cup \{2\} \times A_2$.}
+    \onslide<2->{\item Сравните помеченное объединение с непомеченным \haskinline|union| в C/C++ и с \haskinline|std::variant|.}
+  \end{itemize}
+  \onslide<3->{
+    \centering\small
+    \begin{tabular}{llll}
+      \toprule
+      Тип & Множества & Логика & Алгебра \\
+      \midrule
+      \haskinline|(a, b)| & $A \times B$ & $A \wedge B$ & $a \cdot b$ \\
+      \haskinline|Either a b| & $A \sqcup B$ & $A \vee B$ & $a + b$ \\
+      \haskinline|a -> b| & $B^A$ & $A \to B$ & $b^a$ \\
+      \haskinline|()| & $\{\ast\}$ & истина & $1$ \\
+      \haskinline|Void| & $\varnothing$ & ложь & $0$ \\
+      \bottomrule
+    \end{tabular}
+    \par
+  }
+  \onslide<4->{
+    \begin{itemize}
+      \item Законы алгебры верны с точностью до изоморфизма: $c^{a+b} = c^a \cdot c^b$, т.е. \haskinline|Either a b -> c| $\cong$ \haskinline|(a -> c, b -> c)|.
+    \end{itemize}
+  }
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Типы и модули}
+  \begin{itemize}
+    \item Типы можно импортировать и экспортировать.
+    \item \haskinline|НазваниеТипа(..)| в списке экспорта указывает, что конструкторы тоже включены в список.
+    \item Просто \haskinline|НазваниеТипа| экспортирует только тип без конструкторов.
+    \item Можно также перечислить явно, какие именно конструкторы экспортируются.
+    \item Для импорта всё аналогично.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Записи}\hypertarget{rec2}{}
+  \hyperlink{rec1}{\beamerreturnbutton{К определению записей}}
+  \begin{itemize}
+    \item
+          \begin{haskellsmall}
+            ghci> aPoint = Point 0 (-1)
+            ghci> aPoint { xCoord = 1 } !\pause!
+            Point {xCoord = 1.0, yCoord = -1.0}
+            ghci> aPoint !\pause!
+            Point {xCoord = 0.0, yCoord = -1.0} !\pause!
+            ghci> Point {xCoord = x'} = it
+            ghci> x' !\pause!
+            0.0 !\pause!
+            ghci> :set -XOverloadedRecordDot -XRecordWildCards
+            ghci> aPoint.xCoord
+            0.0 !\pause!
+            ghci> f (Point { xCoord, yCoord }) = xCoord + yCoord
+            ghci> g (Point { .. }) = xCoord + yCoord
+          \end{haskellsmall}
+    \item Два последних образца "--- сокращения\\ \haskinline|Point { xCoord = xCoord, yCoord = yCoord }|.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Записи: минусы}
+  \hyperlink{rec1}{\beamerreturnbutton{К определению записей}}
+  \begin{itemize}
+    \item
+          \begin{haskell}
+ghci> Point { xCoord = 0 }
+\end{haskell}
+          \pause
+          без \haskinline|yCoord| компилируется только с предупреждением (можно сделать ошибкой с помощью опций компилятора).
+          \pause
+    \item Записи можно применять для типов с несколькими конструкторами, но это создаёт частичные (не всюду определённые) функции.
+          \pause
+    \item Одинаковые названия полей у двух записей ведут к проблемам.
+          \pause
+    \item Получается две функции с одинаковыми названиями.
+    \item \haskinline|DisambiguateRecordFields| и \haskinline|DuplicateRecordFields| улучшают ситуацию.
+          \pause
+    \item Есть ещё решения на уровне библиотек.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Переменные типа: область видимости}
+  \begin{itemize}
+    \item Дополнительный материал. По умолчанию область видимости переменной типа "--- сигнатура, где она появилась. Например, в
+          \begin{haskell}
+            moveToEnd :: [a] -> [a]
+            moveToEnd (x:xs) = xs ++ [x :: a]
+          \end{haskell}
+          \pause
+          две переменные \haskinline|a| "--- разные и читаются как
+          \begin{haskell}
+            moveToEnd :: forall a. [a] -> [a]
+            moveToEnd (x:xs) = xs ++ [x :: forall a. a]
+          \end{haskell}
+          \pause
+          (так что функция не скомпилируется).
+          \pause
+    \item С \haskinline|ScopedTypeVariables| (входит в \haskinline|GHC2021|) можно написать так:
+          \begin{haskell}
+            moveToEnd :: forall a. [a] -> [a]
+            moveToEnd (x:xs) = xs ++ [x :: a]
+          \end{haskell}
+    \item Точные правила можно найти в \href{https://downloads.haskell.org/~ghc/latest/docs/users_guide/exts/scoped_type_variables.html}{Lexically scoped type variables}.
+  \end{itemize}
+\end{frame}
+\end{document}

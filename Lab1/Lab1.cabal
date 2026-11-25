@@ -1,0 +1,53 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.39.6.
+--
+-- see: https://github.com/sol/hpack
+
+name:           Lab1
+version:        0.1.0.0
+description:    Лабораторная работа 1 курса «Функциональное программирование на Haskell». См. README.md.
+homepage:       https://github.com/alexeyr/miet-haskell-course#readme
+bug-reports:    https://github.com/alexeyr/miet-haskell-course/issues
+author:         Alexey Romanov
+maintainer:     alexey.v.romanov@gmail.com
+copyright:      2023-2026 Alexey Romanov
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    CHANGELOG.md
+
+source-repository head
+  type: git
+  location: https://github.com/alexeyr/miet-haskell-course
+  subdir: Lab1
+
+library
+  exposed-modules:
+      FirstSteps
+      Lists
+      Luhn
+  other-modules:
+      Paths_Lab1
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -Wno-unused-matches
+  build-depends:
+      base >=4.7 && <5
+  default-language: GHC2021
+
+test-suite Lab1-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_Lab1
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -Wno-unused-matches -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      Lab1
+    , base >=4.7 && <5
+    , hspec
+  default-language: GHC2021

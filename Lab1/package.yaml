@@ -1,0 +1,52 @@
+name:                Lab1
+version:             0.1.0.0
+github:              "alexeyr/miet-haskell-course/Lab1"
+license:             BSD3
+author:              "Alexey Romanov"
+maintainer:          "alexey.v.romanov@gmail.com"
+copyright:           "2023-2026 Alexey Romanov"
+
+extra-source-files:
+- README.md
+- CHANGELOG.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Лабораторная работа 1 курса «Функциональное программирование на Haskell». См. README.md.
+
+dependencies:
+- base >= 4.7 && < 5
+
+language: GHC2021
+
+ghc-options:
+- -Wall
+- -Wcompat
+- -Widentities
+- -Wincomplete-record-updates
+- -Wincomplete-uni-patterns
+# - -Wmissing-export-lists
+- -Wmissing-home-modules
+- -Wpartial-fields
+- -Wredundant-constraints
+- -Wno-unused-matches
+
+library:
+  source-dirs: src
+
+tests:
+  Lab1-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - Lab1
+    - hspec
