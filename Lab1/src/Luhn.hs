@@ -10,5 +10,26 @@ module Luhn where
 -- Не пытайтесь собрать всё в одну функцию, используйте вспомогательные.
 -- Например: разбить число на цифры (возможно, сразу в обратном порядке).
 -- Не забудьте добавить тесты, в том числе для вспомогательных функций!
+
+getDigitsReversed :: Integer -> [Integer]
+getDigitsReversed 0 = []
+getDigitsReversed n =
+  let (rest, digit) = n `divMod` 10
+  in digit : getDigitsReversed rest
+
+doubleDigit :: Integer -> Integer
+doubleDigit d
+  | doubled > 9 = doubled - 9
+  | otherwise = doubled
+  where
+    doubled = 2 * d
+
+sumForLuhn :: [Integer] -> Integer
+sumForLuhn [] = 0
+sumForLuhn [x] = x
+sumForLuhn (x:y:digits) = x + doubleDigit y + sumForLuhn digits
+
 isLuhnValid :: Integer -> Bool
-isLuhnValid = error "todo"
+isLuhnValid n
+  | n <= 0 = False
+  | otherwise = sumForLuhn (getDigitsReversed n) `mod` 10 == 0
