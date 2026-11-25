@@ -9,7 +9,10 @@ module Lists where
 
 -- используйте рекурсию и сопоставление с образцом
 removeFirst :: Integer -> [Integer] -> [Integer]
-removeFirst x xs = error "todo"
+removeFirst _ [] = []
+removeFirst x (y:ys) 
+    | y == x = ys
+    | otherwise = y : removeFirst x ys
 
 -- interleave xs ys чередует элементы списков xs и ys, начиная с xs.
 -- Когда один список заканчивается, добавьте остаток другого списка.
@@ -20,7 +23,9 @@ removeFirst x xs = error "todo"
 
 -- используйте рекурсию и сопоставление с образцом
 interleave :: [a] -> [a] -> [a]
-interleave xs ys = error "todo"
+interleave xs [] = xs
+interleave [] ys = ys
+interleave (x:xs) (y:ys) = x : y : interleave xs ys
 
 -- вектор задаётся списком координат
 newtype Point = Point [Double] deriving (Eq, Show, Read)
@@ -32,7 +37,11 @@ newtype Point = Point [Double] deriving (Eq, Show, Read)
 
 -- используйте рекурсию и сопоставление с образцом
 distance :: Point -> Point -> Double
-distance x y = error "todo"
+distance (Point x) (Point y) = sqrt (sqSum x y)
+  where
+    sqSum [] [] = 0
+    sqSum (a:aa) (b:bb) = (a - b) ** 2 + sqSum aa bb
+    sqSum _ _ = error "Разное число координат!"
 
 -- Нижеперечисленные функции можно реализовать или рекурсивно, или с помощью
 -- стандартных функций для работы со списками (map, filter и т.д.)
@@ -45,21 +54,39 @@ distance x y = error "todo"
 -- findLast (> 0) [-1, 2, -3, 4] == Just 4
 -- find (> 0) [-1, -2, -3] == Nothing
 find, findLast :: (a -> Bool) -> [a] -> Maybe a
-find f xs = error "todo"
-findLast f xs = error "todo"
+find f (x:xs)
+  | f x = Just x
+  | otherwise = find f xs
+find _ [] = Nothing
+
+findLast f (x:xs) = case findLast f xs of
+  Just y -> Just y
+  Nothing -> if f x then Just x else Nothing
+findLast _ [] = Nothing
+
+-- Второй подход к реализации find и findLast, используя стандартные функции для работы со списками
+find2, findLast2 :: (a -> Bool) -> [a] -> Maybe a
+find2 f xs = case filter f xs of
+  (y:_) -> Just y
+  [] -> Nothing
+
+findLast2 f xs = case filter f xs of
+  [] -> Nothing
+  ys -> Just (last ys)
 
 -- mapFuncs принимает список функций fs и возвращает список результатов 
 -- применения всех функций из fs к x.
 -- mapFuncs [\x -> x*x, (1 +), \x -> if even x then 1 else 0] 3 == [9, 4, 0]
 mapFuncs :: [a -> b] -> a -> [b]
-mapFuncs fs x = error "todo"
+mapFuncs fs x = map (\f -> f x) fs
 
 -- satisfiesAll принимает список предикатов (функций, возвращающих Bool) preds
 -- и возвращает True, если все они выполняются (т.е. возвращают True) для x.
 -- satisfiesAll [even, \x -> x `rem` 5 == 0] 10 == True
 -- satisfiesAll [] 4 == True (кстати, почему?)
+-- Отвечая на вопрос, выполняется так называемое vacuous truth
 satisfiesAll :: [a -> Bool] -> a -> Bool
-satisfiesAll preds x = error "todo"
+satisfiesAll preds x = all (\p -> p x) preds
 
 -- Непустой список состоит из первого элемента (головы)
 -- и обычного списка остальных элементов
@@ -69,7 +96,23 @@ data NEL a = NEL a [a] deriving (Eq, Show, Read)
 -- Запишите правильный тип (т.е. такой, чтобы функция имела результат для любых аргументов
 -- без вызовов error) и реализуйте функции на NEL, аналогичные tail, last и zip
 -- tailNel :: NEL a -> ???
+tailNel :: NEL a -> [a]
+tailNel (NEL _ xs) = xs
+
 -- lastNel :: NEL a -> ???
+lastNel :: NEL a -> a
+lastNel (NEL x []) = x
+lastNel (NEL _ (x:xs)) = lastNel (NEL x xs)
+
 -- zipNel :: NEL a -> NEL b -> ???
+zipNel :: NEL a -> NEL b -> NEL (a, b)
+zipNel (NEL x xs) (NEL y ys) = NEL (x, y) (zip xs ys)
+
 -- listToNel :: [a] -> ???
+listToNel :: [a] -> Maybe (NEL a)
+listToNel [] = Nothing
+listToNel (x:xs) = Just (NEL x xs)
+
 -- nelToList :: NEL a -> ???
+nelToList :: NEL a -> [a]
+nelToList (NEL x xs) = x : xs
